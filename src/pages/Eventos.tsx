@@ -53,13 +53,19 @@ function FeaturedCard({ destaque }: { destaque: Event }) {
             e.stopPropagation();
             setIsFavorite(!isFavorite);
           }}
-          className="w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center"
+          className="w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+          aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          aria-pressed={isFavorite}
         >
           <Heart
             className={`w-4 h-4 ${
               isFavorite ? 'fill-purple-500 text-purple-500' : 'text-white'
             }`}
+            aria-hidden="true"
           />
+          <span className="sr-only">
+            {isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          </span>
         </button>
       </div>
       <EventBadge 
@@ -135,13 +141,19 @@ function PopularEventCard({ event }: { event: Event }) {
             e.stopPropagation();
             setIsFavorite(!isFavorite);
           }}
-          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center"
+          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+          aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          aria-pressed={isFavorite}
         >
           <Heart
             className={`w-4 h-4 ${
               isFavorite ? 'fill-purple-500 text-purple-500' : 'text-white'
             }`}
+            aria-hidden="true"
           />
+          <span className="sr-only">
+            {isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          </span>
         </button>
         <EventBadge 
           isFree={event.is_free} 
