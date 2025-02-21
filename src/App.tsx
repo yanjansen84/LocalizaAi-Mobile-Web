@@ -18,6 +18,7 @@ import ConfiguracoesNotificacoes from './pages/ConfiguracoesNotificacoes';
 import FormasPagamento from './pages/FormasPagamento';
 import DetalhesEvento from './pages/DetalhesEvento';
 import CriarEvento from './pages/CriarEvento';
+import EditarEvento from './pages/EditarEvento';
 import EscolhaIngresso from './pages/CompraIngresso/EscolhaIngresso';
 import DadosComprador from './pages/CompraIngresso/DadosComprador';
 import Pagamento from './pages/CompraIngresso/Pagamento';
@@ -59,6 +60,7 @@ function App() {
           <>
             <Route path="/eventos" element={<Eventos />} />
             <Route path="/criar-evento" element={<CriarEvento />} />
+            <Route path="/editar-evento/:id" element={<EditarEvento />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/mapa" element={<Mapa />} />
             <Route path="/notificacoes" element={<Notificacoes />} />
