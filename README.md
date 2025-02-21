@@ -1,62 +1,34 @@
 # LocalizaAi 🗺️
 
-LocalizaAi é uma aplicação web moderna desenvolvida com React e TypeScript que permite aos usuários encontrar e gerenciar eventos em um mapa interativo.
+LocalizaAi é uma plataforma inovadora que revoluciona a maneira como as pessoas descobrem e participam de eventos. Combinando tecnologia de geolocalização com uma interface intuitiva, o LocalizaAi permite que usuários encontrem eventos próximos a eles de forma fácil e interativa.
 
 > ⚠️ **Aviso Legal**: Este é um projeto privado e proprietário. Todos os direitos reservados. O código fonte e a documentação são confidenciais e de propriedade exclusiva dos desenvolvedores do LocalizaAi.
 
-## 🚀 Tecnologias
+## 🎯 Propósito
 
-Este projeto é construído com as seguintes tecnologias:
-
-- **Frontend:**
-  - React 18
-  - TypeScript
-  - Vite
-  - React Router DOM
-  - Google Maps API
-  - React DatePicker
-
-- **Backend:**
-  - Supabase (Banco de dados e Autenticação)
+O LocalizaAi foi desenvolvido para:
+- Conectar pessoas a eventos relevantes em sua região
+- Facilitar a descoberta de novos eventos e experiências
+- Proporcionar uma plataforma completa para organizadores gerenciarem seus eventos
+- Simplificar o processo de compra de ingressos
+- Criar uma comunidade engajada de participantes e organizadores de eventos
 
 ## 📋 Funcionalidades
 
-- Visualização de eventos em um mapa interativo
-- Sistema de autenticação de usuários
-- Cadastro e gerenciamento de eventos
-- Sistema de compra de ingressos
-- Avaliações de eventos
-- Interface responsiva e moderna
+### Para Participantes
+- 🗺️ Visualização de eventos em mapa interativo
+- 🎫 Compra simplificada de ingressos
+- ⭐ Sistema de avaliações e reviews
+- 🔍 Busca avançada por categoria, data e localização
+- 📱 Interface responsiva para acesso em qualquer dispositivo
+- 🔔 Notificações de eventos próximos
 
-## ⚙️ Ambiente de Desenvolvimento
-
-Para configurar o ambiente de desenvolvimento:
-
-1. Configure as variáveis de ambiente no arquivo `.env`:
-```env
-VITE_SUPABASE_URL=sua_url_do_supabase
-VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
-VITE_GOOGLE_MAPS_API_KEY=sua_chave_da_api_do_google_maps
-```
-
-2. Inicie o servidor de desenvolvimento:
-```bash
-npm run dev
-```
-
-## 🗄️ Banco de Dados
-
-O projeto utiliza Supabase como banco de dados. Para gerenciar o banco de dados:
-
-1. Execute as migrações:
-```bash
-npm run migrate
-```
-
-2. Para criar novas migrações:
-```bash
-npm run migrate:new nome_da_migracao
-```
+### Para Organizadores
+- 📊 Dashboard completo para gestão de eventos
+- 📈 Análise de vendas e público
+- 📝 Ferramentas de criação e edição de eventos
+- 💰 Gestão financeira de vendas
+- 📨 Sistema de comunicação com participantes
 
 ## 📝 Direitos Autorais
 
