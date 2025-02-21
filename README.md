@@ -2,6 +2,8 @@
 
 LocalizaAi é uma aplicação web moderna desenvolvida com React e TypeScript que permite aos usuários encontrar e gerenciar eventos em um mapa interativo.
 
+> ⚠️ **Aviso Legal**: Este é um projeto privado e proprietário. Todos os direitos reservados. O código fonte e a documentação são confidenciais e de propriedade exclusiva dos desenvolvedores do LocalizaAi.
+
 ## 🚀 Tecnologias
 
 Este projeto é construído com as seguintes tecnologias:
@@ -26,35 +28,25 @@ Este projeto é construído com as seguintes tecnologias:
 - Avaliações de eventos
 - Interface responsiva e moderna
 
-## 🛠️ Instalação
+## ⚙️ Ambiente de Desenvolvimento
 
-1. Clone o repositório:
-```bash
-git clone https://github.com/yanjansen84/LocalizaAi.git
-```
+Para configurar o ambiente de desenvolvimento:
 
-2. Instale as dependências:
-```bash
-cd LocalizaAi
-npm install
-```
-
-3. Configure as variáveis de ambiente:
-Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
+1. Configure as variáveis de ambiente no arquivo `.env`:
 ```env
 VITE_SUPABASE_URL=sua_url_do_supabase
 VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
 VITE_GOOGLE_MAPS_API_KEY=sua_chave_da_api_do_google_maps
 ```
 
-4. Inicie o servidor de desenvolvimento:
+2. Inicie o servidor de desenvolvimento:
 ```bash
 npm run dev
 ```
 
 ## 🗄️ Banco de Dados
 
-O projeto utiliza Supabase como banco de dados. Para configurar o banco de dados:
+O projeto utiliza Supabase como banco de dados. Para gerenciar o banco de dados:
 
 1. Execute as migrações:
 ```bash
@@ -66,14 +58,12 @@ npm run migrate
 npm run migrate:new nome_da_migracao
 ```
 
-## 🤝 Contribuindo
+## 📝 Direitos Autorais
 
-Contribuições são sempre bem-vindas! Por favor, sinta-se à vontade para abrir uma issue ou enviar um pull request.
+Copyright 2025 LocalizaAi. Todos os direitos reservados.
 
-## 📝 Licença
+Este software é proprietário e confidencial. Nenhuma parte do código fonte deste software pode ser copiada, distribuída, modificada ou incorporada em outros softwares sem a autorização expressa por escrito dos proprietários do LocalizaAi.
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+## 👤 Desenvolvedor
 
-## 👥 Autores
-
-- [@yanjansen84](https://github.com/yanjansen84)
+- Yan Jansen
