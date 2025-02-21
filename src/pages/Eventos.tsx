@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, Heart, MapPin, Calendar, Plus, Loader 
 } from 'lucide-react';
@@ -215,64 +215,94 @@ function Eventos() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300); // 300ms delay
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   async function loadEvents() {
     try {
       setLoading(true);
+      setError(null);
 
-      // Primeiro obtém a localização do usuário
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!("geolocation" in navigator)) {
-          reject(new Error('Geolocalização não disponível'));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      });
-
-      // Busca todos os eventos e depois filtra por distância
-      const { data, error } = await supabase
+      // Carregar eventos primeiro
+      const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
         .order('date', { ascending: true });
 
-      if (error) throw error;
+      if (eventsError) throw eventsError;
 
-      // Filtra eventos por distância (20km) e data
+      // Filtrar eventos por data
       const now = new Date();
-      const futureEvents = (data || []).filter(event => {
+      let futureEvents = (eventsData || []).filter(event => {
         const eventDate = new Date(event.date);
-        if (eventDate < now) return false;
-
-        // Calcula distância aproximada em km
-        const lat1 = position.coords.latitude;
-        const lon1 = position.coords.longitude;
-        const lat2 = event.latitude;
-        const lon2 = event.longitude;
-        
-        const R = 6371; // Raio da Terra em km
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = 
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-          Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
-
-        return distance <= 20; // 20km de raio
+        return eventDate >= now;
       });
 
-      setEvents(futureEvents);
-      setFilteredEvents(futureEvents);
-      setError(null);
+      // Iniciar carregamento da localização em paralelo
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat1 = position.coords.latitude;
+            const lon1 = position.coords.longitude;
+            
+            // Filtrar eventos por distância
+            futureEvents = futureEvents.filter(event => {
+              const lat2 = event.latitude;
+              const lon2 = event.longitude;
+              
+              const R = 6371;
+              const dLat = (lat2 - lat1) * Math.PI / 180;
+              const dLon = (lon2 - lon1) * Math.PI / 180;
+              const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              const distance = R * c;
+
+              return distance <= 20;
+            });
+
+            setEvents(futureEvents);
+            setFilteredEvents(futureEvents);
+          },
+          (error) => {
+            console.warn('Erro de geolocalização:', error);
+            // Se houver erro na geolocalização, ainda mostra os eventos futuros
+            setEvents(futureEvents);
+            setFilteredEvents(futureEvents);
+          }
+        );
+      } else {
+        // Se geolocalização não estiver disponível, mostra todos os eventos futuros
+        setEvents(futureEvents);
+        setFilteredEvents(futureEvents);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar eventos:', error);
-      setError('Não foi possível carregar os eventos da sua região. Verifique se permitiu o acesso à sua localização.');
+      setError('Não foi possível carregar os eventos. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
   }
+
+  // Memoize a função de filtro para evitar recálculos desnecessários
+  const filterEvents = useCallback(() => {
+    let filtered = [...events];
+
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(event => event.category_id === selectedCategory);
+    }
+
+    if (debouncedSearch.trim()) {
+      const query = debouncedSearch.toLowerCase().trim();
+      filtered = filtered.filter(event => 
+        event.title.toLowerCase().includes(query) ||
+        event.location.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredEvents(filtered);
+  }, [events, selectedCategory, debouncedSearch]);
 
   useEffect(() => {
     if (user) {
@@ -283,50 +313,22 @@ function Eventos() {
 
   useEffect(() => {
     filterEvents();
-  }, [debouncedSearch, selectedCategory, events]);
+  }, [filterEvents]);
 
-  const filterEvents = () => {
-    let filtered = [...events];
-
-    // Filtra por categoria
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(event => event.category_id === selectedCategory);
-    }
-
-    // Filtra por termo de busca
-    if (debouncedSearch.trim()) {
-      const query = debouncedSearch.toLowerCase().trim();
-      filtered = filtered.filter(event => 
-        event.title.toLowerCase().includes(query) ||
-        event.location.toLowerCase().includes(query)
-      );
-    }
-
-    setFilteredEvents(filtered);
-  };
-
+  // Remover useEffect desnecessário
   const loadCategories = async () => {
     try {
       const categoriesList = await getCategories();
       setCategories(categoriesList);
+      // Atualizar categorias ativas aqui mesmo
+      const categoriesWithEvents = categoriesList.filter(category =>
+        events.some(event => event.category_id === category.id)
+      );
+      setActiveCategories(categoriesWithEvents);
     } catch (error) {
       console.error('Error loading categories:', error);
     }
   };
-
-  useEffect(() => {
-    // Atualiza as categorias ativas quando os eventos mudarem
-    const categoriesWithEvents = categories.filter(category =>
-      events.some(event => event.category_id === category.id)
-    );
-    setActiveCategories(categoriesWithEvents);
-  }, [categories, events]);
-
-  useEffect(() => {
-    if (debouncedSearch !== searchQuery) {
-      setLoading(true);
-    }
-  }, [debouncedSearch]);
 
   if (loading) {
     return (
