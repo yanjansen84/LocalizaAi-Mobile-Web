@@ -33,6 +33,45 @@ html, body {
     scrollbar-width: none;  /* Firefox */
     -webkit-overflow-scrolling: touch;
   }
+  .animate-scale-up {
+    @apply transition-transform duration-200 ease-out hover:scale-[1.02];
+  }
+
+  .animate-favorite {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .skeleton {
+    @apply animate-pulse bg-gray-200 dark:bg-gray-700;
+  }
+
+  /* Transições suaves para elementos interativos */
+  button, a {
+    @apply transition-all duration-200;
+  }
+
+  /* Animação de fade para elementos que aparecem/desaparecem */
+  .fade-enter {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  
+  .fade-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms, transform 300ms;
+  }
+  
+  .fade-exit {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .fade-exit-active {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 300ms, transform 300ms;
+  }
 }
 
 /* Melhorar experiência de toque */

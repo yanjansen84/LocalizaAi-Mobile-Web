@@ -9,6 +9,8 @@ import Navbar from '../components/Navbar';
 import { Category, getCategories } from '../lib/categories';
 import { EventBadge } from '../components/EventBadge';
 import { Header } from '../components/Header';
+import { useDebounce } from '../hooks/useDebounce';
+import { EventSkeleton, FeaturedEventSkeleton } from '../components/EventSkeleton';
 
 interface Event {
   id: string;
@@ -30,8 +32,20 @@ interface Profile {
 
 function FeaturedCard({ destaque }: { destaque: Event }) {
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const navigate = useNavigate();
   const defaultImage = 'https://placehold.co/600x400/9333ea/ffffff?text=Evento';
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsAnimating(true);
+    setIsFavorite(!isFavorite);
+    
+    // Animação de scale
+    setTimeout(() => {
+      setIsAnimating(false);
+    }, 300);
+  };
 
   return (
     <div 
@@ -49,16 +63,15 @@ function FeaturedCard({ destaque }: { destaque: Event }) {
       />
       <div className="absolute top-3 right-3">
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsFavorite(!isFavorite);
-          }}
-          className="w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+          onClick={handleFavoriteClick}
+          className={`w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-transform ${
+            isAnimating ? 'scale-125' : ''
+          }`}
           aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
           aria-pressed={isFavorite}
         >
           <Heart
-            className={`w-4 h-4 ${
+            className={`w-4 h-4 transition-colors ${
               isFavorite ? 'fill-purple-500 text-purple-500' : 'text-white'
             }`}
             aria-hidden="true"
@@ -96,6 +109,7 @@ function FeaturedCard({ destaque }: { destaque: Event }) {
 
 function PopularEventCard({ event }: { event: Event }) {
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const navigate = useNavigate();
   const defaultImage = 'https://placehold.co/600x400/9333ea/ffffff?text=Evento';
 
@@ -121,6 +135,17 @@ function PopularEventCard({ event }: { event: Event }) {
     return location.split('-')[0].trim();
   };
 
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsAnimating(true);
+    setIsFavorite(!isFavorite);
+    
+    // Animação de scale
+    setTimeout(() => {
+      setIsAnimating(false);
+    }, 300);
+  };
+
   return (
     <div 
       className="rounded-[24px] overflow-hidden bg-white dark:bg-gray-800 shadow-lg cursor-pointer animate-scale-up"
@@ -132,21 +157,20 @@ function PopularEventCard({ event }: { event: Event }) {
           alt={event.title}
           className="w-full h-40 object-cover"
           onError={(e) => {
-            const target = e.target as HTMLImageElement;
+            const target =e.target as HTMLImageElement;
             target.src = defaultImage;
           }}
         />
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsFavorite(!isFavorite);
-          }}
-          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+          onClick={handleFavoriteClick}
+          className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-transform ${
+            isAnimating ? 'scale-125' : ''
+          }`}
           aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
           aria-pressed={isFavorite}
         >
           <Heart
-            className={`w-4 h-4 ${
+            className={`w-4 h-4 transition-colors ${
               isFavorite ? 'fill-purple-500 text-purple-500' : 'text-white'
             }`}
             aria-hidden="true"
@@ -190,6 +214,7 @@ function Eventos() {
   const [activeCategories, setActiveCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300); // 300ms delay
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   async function loadEvents() {
@@ -258,7 +283,7 @@ function Eventos() {
 
   useEffect(() => {
     filterEvents();
-  }, [selectedCategory, events, searchQuery]);
+  }, [debouncedSearch, selectedCategory, events]);
 
   const filterEvents = () => {
     let filtered = [...events];
@@ -269,8 +294,8 @@ function Eventos() {
     }
 
     // Filtra por termo de busca
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
+    if (debouncedSearch.trim()) {
+      const query = debouncedSearch.toLowerCase().trim();
       filtered = filtered.filter(event => 
         event.title.toLowerCase().includes(query) ||
         event.location.toLowerCase().includes(query)
@@ -296,6 +321,12 @@ function Eventos() {
     );
     setActiveCategories(categoriesWithEvents);
   }, [categories, events]);
+
+  useEffect(() => {
+    if (debouncedSearch !== searchQuery) {
+      setLoading(true);
+    }
+  }, [debouncedSearch]);
 
   if (loading) {
     return (
@@ -340,29 +371,33 @@ function Eventos() {
               />
             </div>
           </div>
-          {searchQuery ? (
-            // Resultados da Pesquisa
+          {loading ? (
             <div className="px-4 py-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Resultados da Pesquisa
-              </h2>
-              {loading ? (
-                <div className="flex justify-center">
-                  <Loader className="w-6 h-6 text-purple-600 animate-spin" />
-                </div>
-              ) : filteredEvents.length > 0 ? (
-                <div className="grid grid-cols-2 gap-4">
-                  {filteredEvents.map((event) => (
-                    <PopularEventCard key={event.id} event={event} />
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Em Destaque 🌟
+                </h2>
+              </div>
+              <div className="overflow-x-auto no-scrollbar">
+                <div className="inline-flex gap-4 px-4 pb-4">
+                  {[1, 2, 3].map((index) => (
+                    <FeaturedEventSkeleton key={index} />
                   ))}
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Nenhum evento encontrado para "{searchQuery}"
-                  </p>
+              </div>
+
+              <div className="mt-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Eventos Populares 🔥
+                  </h2>
                 </div>
-              )}
+                <div className="grid grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((index) => (
+                    <EventSkeleton key={index} />
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             // Conteúdo Normal

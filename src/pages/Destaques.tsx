@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import { Category, getCategories } from '../lib/categories';
+import { EventBadge } from '../components/EventBadge';
 
 interface Event {
   id: string;
@@ -12,6 +13,8 @@ interface Event {
   location: string;
   image_url: string;
   category_id: string;
+  is_free: boolean;
+  price: number;
 }
 
 function Destaques() {
@@ -149,9 +152,14 @@ function Destaques() {
             <img
               src={event.image_url || 'https://placehold.co/600x400/9333ea/ffffff?text=Evento'}
               alt={event.title}
-              className="w-full h-full object-cover"
+              className="w-full h-48 object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-black/20 p-4 flex flex-col justify-end">
+              <EventBadge 
+                isFree={event.is_free}
+                price={event.price}
+                className="absolute top-4 right-4"
+              />
               <h3 className="text-white text-lg font-semibold mb-1">
                 {event.title}
               </h3>
