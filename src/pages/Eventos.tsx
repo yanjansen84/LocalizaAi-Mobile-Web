@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, Search, Heart, MapPin, Calendar, Plus, Loader 
 } from 'lucide-react';
@@ -6,7 +6,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
-import { Category, getCategories } from '../lib/categories';
+import { truncateText, formatDate, formatDateFeatured, simplifyLocation } from '../utils/formatters';
+import { useFavorites } from '../hooks/useFavorites';
+import { EventSkeleton, FeaturedEventSkeleton } from '../components/EventSkeleton';
+import { useEvents } from '../hooks/useEvents';
+import { useCategories } from '../hooks/useCategories';
 
 interface Event {
   id: string;
@@ -25,20 +29,31 @@ interface Profile {
   avatar_url: string | null;
 }
 
-function FeaturedCard({ destaque }: { destaque: Event }) {
-  const [isFavorite, setIsFavorite] = useState(false);
+const FeaturedCard = React.memo(({ destaque }: { destaque: Event }) => {
+  const { isFavorite, toggleFavorite, isLoading } = useFavorites();
   const navigate = useNavigate();
   const defaultImage = 'https://placehold.co/600x400/9333ea/ffffff?text=Evento';
+
+  const handleFavoriteClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleFavorite(destaque.id);
+  }, [destaque.id, toggleFavorite]);
+
+  const handleCardClick = useCallback(() => {
+    navigate(`/evento/${destaque.id}`);
+  }, [destaque.id, navigate]);
 
   return (
     <div 
       className="relative flex-shrink-0 w-80 rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg cursor-pointer animate-scale-up"
-      onClick={() => navigate(`/evento/${destaque.id}`)}
+      onClick={handleCardClick}
     >
       <img
         src={destaque.image_url || defaultImage}
         alt={destaque.title}
         className="w-full h-48 object-cover"
+        loading="lazy"
+        decoding="async"
         onError={(e) => {
           const target = e.target as HTMLImageElement;
           target.src = defaultImage;
@@ -46,15 +61,14 @@ function FeaturedCard({ destaque }: { destaque: Event }) {
       />
       <div className="absolute top-3 right-3">
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsFavorite(!isFavorite);
-          }}
+          onClick={handleFavoriteClick}
           className="w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center"
+          disabled={isLoading(destaque.id)}
+          aria-label={isFavorite(destaque.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
         >
           <Heart
             className={`w-4 h-4 ${
-              isFavorite ? 'fill-purple-500 text-purple-500' : 'text-white'
+              isFavorite(destaque.id) ? 'fill-purple-500 text-purple-500' : 'text-white'
             }`}
           />
         </button>
@@ -62,76 +76,60 @@ function FeaturedCard({ destaque }: { destaque: Event }) {
       <div className="p-4">
         <h3 className="text-gray-900 dark:text-white font-semibold text-lg mb-2">{destaque.title}</h3>
         <div className="flex items-center text-purple-600 text-sm mb-2">
-          <Calendar className="w-4 h-4 mr-2" />
-          <span>{new Date(destaque.date).toLocaleDateString('pt-BR', {
-            weekday: 'short',
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}</span>
+          <Calendar className="w-4 h-4 mr-2" aria-hidden="true" />
+          <span>{formatDateFeatured(destaque.date)}</span>
         </div>
         <div className="flex items-center text-gray-600 dark:text-gray-400 text-sm">
-          <MapPin className="w-4 h-4 mr-2" />
+          <MapPin className="w-4 h-4 mr-2" aria-hidden="true" />
           <span>{destaque.location}</span>
         </div>
       </div>
     </div>
   );
-}
+});
 
-function PopularEventCard({ event }: { event: Event }) {
-  const [isFavorite, setIsFavorite] = useState(false);
+FeaturedCard.displayName = 'FeaturedCard';
+
+const PopularEventCard = React.memo(({ event }: { event: Event }) => {
+  const { isFavorite, toggleFavorite, isLoading } = useFavorites();
   const navigate = useNavigate();
   const defaultImage = 'https://placehold.co/600x400/9333ea/ffffff?text=Evento';
 
-  // Função para truncar o texto
-  const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-  };
+  const handleFavoriteClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleFavorite(event.id);
+  }, [event.id, toggleFavorite]);
 
-  // Função para formatar a data de forma mais concisa
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Função para simplificar o endereço
-  const simplifyLocation = (location: string) => {
-    return location.split('-')[0].trim();
-  };
+  const handleCardClick = useCallback(() => {
+    navigate(`/evento/${event.id}`);
+  }, [event.id, navigate]);
 
   return (
     <div 
       className="rounded-[24px] overflow-hidden bg-white dark:bg-gray-800 shadow-lg cursor-pointer animate-scale-up"
-      onClick={() => navigate(`/evento/${event.id}`)}
+      onClick={handleCardClick}
     >
       <div className="relative">
         <img
           src={event.image_url || defaultImage}
           alt={event.title}
           className="w-full h-40 object-cover"
+          loading="lazy"
+          decoding="async"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
             target.src = defaultImage;
           }}
         />
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsFavorite(!isFavorite);
-          }}
+          onClick={handleFavoriteClick}
           className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/20 backdrop-blur-sm flex items-center justify-center"
+          disabled={isLoading(event.id)}
+          aria-label={isFavorite(event.id) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
         >
           <Heart
             className={`w-4 h-4 ${
-              isFavorite ? 'fill-purple-500 text-purple-500' : 'text-white'
+              isFavorite(event.id) ? 'fill-purple-500 text-purple-500' : 'text-white'
             }`}
           />
         </button>
@@ -141,136 +139,151 @@ function PopularEventCard({ event }: { event: Event }) {
           {truncateText(event.title, 25)}
         </h3>
         <div className="flex items-center text-purple-600 text-xs mb-1">
-          <Calendar className="w-3 h-3 mr-1" />
+          <Calendar className="w-3 h-3 mr-1" aria-hidden="true" />
           <span>{formatDate(event.date)}</span>
         </div>
         <div className="flex items-center text-gray-600 dark:text-gray-400 text-xs">
-          <MapPin className="w-3 h-3 mr-1" />
+          <MapPin className="w-3 h-3 mr-1" aria-hidden="true" />
           <span>{simplifyLocation(event.location)}</span>
         </div>
       </div>
     </div>
   );
-}
+});
+
+PopularEventCard.displayName = 'PopularEventCard';
 
 function Eventos() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { loadFavorites } = useFavorites();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategories, setActiveCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  async function loadEvents() {
+  const { 
+    events,
+    filteredEvents,
+    loading,
+    error,
+    hasMore,
+    loadEvents,
+    loadMoreEvents,
+    filterEvents
+  } = useEvents({ pageSize: 10 });
+
+  const {
+    categories,
+    activeCategories,
+    loading: categoriesLoading,
+    updateActiveCategories
+  } = useCategories();
+
+  const loadProfile = useCallback(async () => {
     try {
-      setLoading(true);
-
-      // Primeiro obtém a localização do usuário
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!("geolocation" in navigator)) {
-          reject(new Error('Geolocalização não disponível'));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      });
-
-      // Busca todos os eventos e depois filtra por distância
+      if (!user) return;
+      
       const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('date', { ascending: true });
+        .from('users')
+        .select('full_name, avatar_url')
+        .eq('id', user.id)
+        .single();
 
       if (error) throw error;
-
-      // Filtra eventos por distância (20km) e data
-      const now = new Date();
-      const futureEvents = (data || []).filter(event => {
-        const eventDate = new Date(event.date);
-        if (eventDate < now) return false;
-
-        // Calcula distância aproximada em km
-        const lat1 = position.coords.latitude;
-        const lon1 = position.coords.longitude;
-        const lat2 = event.latitude;
-        const lon2 = event.longitude;
-        
-        const R = 6371; // Raio da Terra em km
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = 
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-          Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
-
-        return distance <= 20; // 20km de raio
-      });
-
-      setEvents(futureEvents);
-      setFilteredEvents(futureEvents);
-      setError(null);
+      
+      setProfile(data);
     } catch (error) {
-      console.error('Erro ao carregar eventos:', error);
-      setError('Não foi possível carregar os eventos da sua região. Verifique se permitiu o acesso à sua localização.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (user) {
-      loadEvents();
-      loadCategories();
+      console.error('Erro ao carregar perfil:', error);
     }
   }, [user]);
 
   useEffect(() => {
-    filterEvents();
-  }, [selectedCategory, events, searchQuery]);
-
-  const filterEvents = () => {
-    let filtered = [...events];
-
-    // Filtra por categoria
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(event => event.category_id === selectedCategory);
-    }
-
-    // Filtra por termo de busca
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(event => 
-        event.title.toLowerCase().includes(query) ||
-        event.location.toLowerCase().includes(query)
-      );
-    }
-
-    setFilteredEvents(filtered);
-  };
-
-  const loadCategories = async () => {
-    try {
-      const categoriesList = await getCategories();
-      setCategories(categoriesList);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
+    filterEvents(selectedCategory, searchQuery);
+  }, [filterEvents, selectedCategory, searchQuery]);
 
   useEffect(() => {
-    // Atualiza as categorias ativas quando os eventos mudarem
-    const categoriesWithEvents = categories.filter(category =>
-      events.some(event => event.category_id === category.id)
+    if (events.length > 0) {
+      const categoryIds = [...new Set(events.map(event => event.category_id))];
+      updateActiveCategories(categoryIds);
+    }
+  }, [events, updateActiveCategories]);
+
+  useEffect(() => {
+    if (user) {
+      loadProfile();
+      loadFavorites();
+      loadEvents(1);
+    }
+  }, [user, loadProfile, loadFavorites, loadEvents]);
+
+  const renderLoadingSkeletons = useCallback(() => {
+    return (
+      <>
+        <div className="mb-8">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-4" />
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {[1, 2, 3].map(i => (
+              <FeaturedEventSkeleton key={`featured-skeleton-${i}`} />
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <EventSkeleton key={`event-skeleton-${i}`} />
+          ))}
+        </div>
+      </>
     );
-    setActiveCategories(categoriesWithEvents);
-  }, [categories, events]);
+  }, []);
+
+  const renderEvents = useCallback(() => {
+    if (loading && events.length === 0) {
+      return renderLoadingSkeletons();
+    }
+
+    if (error) {
+      return <div className="text-center text-red-500 py-8">{error}</div>;
+    }
+
+    if (events.length === 0) {
+      return <div className="text-center py-8">Nenhum evento encontrado</div>;
+    }
+
+    const eventsToDisplay = filteredEvents.length > 0 ? filteredEvents : events;
+
+    return (
+      <>
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">Eventos em Destaque</h2>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {eventsToDisplay.slice(0, 3).map(event => (
+              <FeaturedCard key={event.id} destaque={event} />
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {eventsToDisplay.map(event => (
+            <PopularEventCard key={event.id} event={event} />
+          ))}
+        </div>
+
+        {hasMore && (
+          <div className="text-center mt-8">
+            <button
+              onClick={loadMoreEvents}
+              disabled={loading}
+              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+            >
+              {loading ? 'Carregando...' : 'Carregar Mais'}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  }, [loading, error, events, filteredEvents, hasMore, loadMoreEvents, renderLoadingSkeletons]);
 
   if (loading) {
     return (
@@ -299,7 +312,6 @@ function Eventos() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex flex-col h-screen">
-        {/* Header Fixo */}
         <header className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between mb-4">
@@ -354,11 +366,9 @@ function Eventos() {
           </div>
         </header>
 
-        {/* Conteúdo Scrollável */}
         <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
           <div className="pb-20">
             {searchQuery ? (
-              // Resultados da Pesquisa
               <div className="px-4 py-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Resultados da Pesquisa
@@ -382,13 +392,11 @@ function Eventos() {
                 )}
               </div>
             ) : (
-              // Conteúdo Normal
               <>
-                {/* Featured Events */}
                 <div className="px-4 py-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Em Destaque 🌟
+                      Em Destaque 
                     </h2>
                     <Link
                       to="/destaques"
@@ -412,11 +420,10 @@ function Eventos() {
                   )}
                 </div>
 
-                {/* Popular Events */}
                 <div className="px-4 py-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Eventos Populares 🔥
+                      Eventos Populares 
                     </h2>
                     <Link
                       to="/populares"
@@ -426,7 +433,6 @@ function Eventos() {
                     </Link>
                   </div>
 
-                  {/* Categories */}
                   <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
                     <button 
                       onClick={() => setSelectedCategory('all')}
@@ -453,7 +459,6 @@ function Eventos() {
                     ))}
                   </div>
 
-                  {/* Event Cards */}
                   <div className="grid grid-cols-2 gap-4">
                     {loading ? (
                       <div className="flex justify-center col-span-2">
@@ -477,7 +482,6 @@ function Eventos() {
           </div>
         </div>
 
-        {/* Navbar Fixa */}
         <Navbar />
       </div>
     </div>
