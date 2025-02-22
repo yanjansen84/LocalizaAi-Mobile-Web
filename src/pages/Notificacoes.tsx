@@ -1,35 +1,25 @@
 import React from 'react';
-import { ArrowLeft, Bell, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-interface Notification {
-  id: number;
-  type: 'follow' | 'payment' | 'cancel' | 'feature';
-  title?: string;
-  message: string;
-  date: string;
-  timeGroup: 'Últimos 7 dias' | 'Últimos 30 dias' | 'Anterior';
-  icon?: string;
-  color?: string;
-  userId?: string;
-  userName?: string;
-  userImage?: string;
-}
+import { useNotification, formatNotificationDate } from '../contexts/NotificationContext';
+import type { Notification } from '../contexts/NotificationContext';
 
 function NotificationItem({ notification }: { notification: Notification }) {
   const navigate = useNavigate();
   const [isFollowing, setIsFollowing] = React.useState(true);
+  const { markAsRead } = useNotification();
 
-  const handleClick = () => {
-    if (notification.type === 'follow' && notification.userId) {
-      navigate(`/perfil/${notification.userId}`);
+  const handleClick = async () => {
+    if (notification.type === 'follow') {
+      await markAsRead(notification.id);
+      navigate(`/perfil/${notification.from_user_id}`);
     }
   };
 
   const handleFollowClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsFollowing(!isFollowing);
-    // Aqui você pode adicionar a lógica para seguir/deixar de seguir
+    // TODO: Implementar lógica de follow/unfollow quando o contexto de usuário estiver pronto
   };
 
   return (
@@ -39,19 +29,19 @@ function NotificationItem({ notification }: { notification: Notification }) {
     >
       <div className="w-12 h-12">
         <img 
-          src={notification.userImage} 
-          alt={notification.userName} 
+          src={notification.from_user_image} 
+          alt={notification.from_user_name} 
           className="w-full h-full rounded-full object-cover"
         />
       </div>
       
       <div className="flex-1 text-left">
         <span className="text-sm text-gray-900 dark:text-white">
-          <span className="font-semibold">{notification.userName}</span>
+          <span className="font-semibold">{notification.from_user_name}</span>
           {' '}{notification.message}
         </span>
         <span className="text-xs text-gray-500 block mt-0.5">
-          {notification.date}
+          {formatNotificationDate(notification.created_at)}
         </span>
       </div>
 
@@ -70,76 +60,36 @@ function NotificationItem({ notification }: { notification: Notification }) {
   );
 }
 
+function groupNotificationsByDate(notifications: Notification[]) {
+  const groups = notifications.reduce((acc, notification) => {
+    const date = new Date(notification.created_at);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let timeGroup = 'Anterior';
+    if (diffDays < 7) {
+      timeGroup = 'Últimos 7 dias';
+    } else if (diffDays < 30) {
+      timeGroup = 'Últimos 30 dias';
+    }
+
+    if (!acc[timeGroup]) {
+      acc[timeGroup] = [];
+    }
+    acc[timeGroup].push(notification);
+    return acc;
+  }, {} as Record<string, Notification[]>);
+
+  return Object.entries(groups).map(([timeGroup, notifications]) => ({
+    timeGroup,
+    notifications
+  }));
+}
+
 function Notificacoes() {
   const navigate = useNavigate();
-  const [hasNotifications, setHasNotifications] = React.useState(true);
-
-  const notifications: Notification[] = [
-    {
-      id: 1,
-      type: 'follow',
-      message: 'começou a seguir você.',
-      date: '1 d',
-      timeGroup: 'Últimos 7 dias',
-      userId: '123',
-      userName: 'docerrefugio',
-      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=doce'
-    },
-    {
-      id: 2,
-      type: 'follow',
-      message: 'curtiu seu story.',
-      date: '2 d',
-      timeGroup: 'Últimos 7 dias',
-      userId: '124',
-      userName: 'aliciinhahoficial',
-      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alicia'
-    },
-    {
-      id: 3,
-      type: 'follow',
-      message: 'e outras 3 pessoas convidaram você para participar de canais de transmissão.',
-      date: '4 d',
-      timeGroup: 'Últimos 7 dias',
-      userId: '125',
-      userName: 'duploacerto, chocolateriasophia',
-      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=duplo'
-    },
-    {
-      id: 4,
-      type: 'follow',
-      message: 'postou uma thread que talvez você curta: Let\'s go',
-      date: '5 d',
-      timeGroup: 'Últimos 7 dias',
-      userId: '126',
-      userName: '_allanessantos',
-      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=allan'
-    },
-    {
-      id: 5,
-      type: 'follow',
-      message: 'curtiram seu story.',
-      date: '1 sem',
-      timeGroup: 'Últimos 30 dias',
-      userId: '127',
-      userName: 'aliciinhahoficial e deboradiasdld',
-      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alicia2'
-    }
-  ];
-
-  // Agrupa as notificações por período
-  const groupedNotifications = notifications.reduce((groups, notification) => {
-    const group = groups.find(g => g.timeGroup === notification.timeGroup);
-    if (group) {
-      group.notifications.push(notification);
-    } else {
-      groups.push({
-        timeGroup: notification.timeGroup,
-        notifications: [notification]
-      });
-    }
-    return groups;
-  }, [] as { timeGroup: string; notifications: Notification[] }[]);
+  const { notifications } = useNotification();
+  const groupedNotifications = groupNotificationsByDate(notifications);
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
@@ -162,7 +112,7 @@ function Notificacoes() {
 
       {/* Content */}
       <div className="flex-1">
-        {!hasNotifications ? (
+        {notifications.length === 0 ? (
           <div className="h-[calc(100vh-70px)] flex flex-col items-center justify-center p-4">
             <div className="w-20 h-20 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center mb-4">
               <Bell className="w-10 h-10 text-purple-600" />

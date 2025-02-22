@@ -33,6 +33,7 @@ import GerenciarEventos from './pages/GerenciarEventos';
 import ResultadosEvento from './pages/ResultadosEvento';
 import Search from './pages/Search';
 import { Toaster } from 'react-hot-toast';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 function LoadingScreen() {
   return (
@@ -50,56 +51,58 @@ function App() {
   }
 
   return (
-    <Suspense fallback={<LoadingScreen />}>
-      <Toaster position="top-center" />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={!user ? <Login /> : <Navigate to="/eventos" replace />} />
-        <Route path="/esqueceu-senha" element={<EsqueceuSenha />} />
-        <Route path="/cadastro" element={<Cadastro />} />
+    <NotificationProvider>
+      <Suspense fallback={<LoadingScreen />}>
+        <Toaster position="top-center" />
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={!user ? <Login /> : <Navigate to="/eventos" replace />} />
+          <Route path="/esqueceu-senha" element={<EsqueceuSenha />} />
+          <Route path="/cadastro" element={<Cadastro />} />
 
-        {/* Protected Routes */}
-        {user ? (
-          <>
-            <Route path="/eventos" element={<Eventos />} />
-            <Route path="/criar-evento" element={<CriarEvento />} />
-            <Route path="/editar-evento/:id" element={<EditarEvento />} />
-            <Route path="/feed" element={<Feed />} />
-            <Route path="/mapa" element={<Mapa />} />
-            <Route path="/notificacoes" element={<Notificacoes />} />
-            <Route path="/destaques" element={<Destaques />} />
-            <Route path="/eventos-populares" element={<EventosPopulares />} />
-            <Route path="/perfil" element={<Perfil />} />
-            <Route path="/perfil/:id" element={<Perfil />} />
-            <Route path="/ingressos" element={<Ingressos />} />
-            <Route path="/search" element={<Search />} />
-            
-            {/* Configurações Routes */}
-            <Route path="/configuracoes" element={<Configuracoes />} />
-            <Route path="/configuracoes/perfil" element={<EditarPerfil />} />
-            <Route path="/configuracoes/notificacoes" element={<ConfiguracoesNotificacoes />} />
-            <Route path="/configuracoes/pagamento" element={<FormasPagamento />} />
-            <Route path="/gerenciar-eventos" element={<GerenciarEventos />} />
-            <Route path="/evento/:id/resultados" element={<ResultadosEvento />} />
-            
-            {/* Evento e Compra Routes */}
-            <Route path="/evento/:id" element={<DetalhesEvento />} />
-            <Route path="/compra-ingresso/escolha-ingresso" element={<EscolhaIngresso />} />
-            <Route path="/compra-ingresso/dados-comprador" element={<DadosComprador />} />
-            <Route path="/compra-ingresso/pagamento" element={<Pagamento />} />
-            <Route path="/compra-ingresso/cadastro-cartao" element={<CadastroCartao />} />
-            <Route path="/compra-ingresso/resumo" element={<Resumo />} />
-            <Route path="/compra-ingresso/status" element={<Status />} />
-            <Route path="/compra-ingresso/ingresso" element={<Ingresso />} />
-            <Route path="/compra-ingresso/cancelar" element={<CancelarReserva />} />
-            <Route path="/compra-ingresso/avaliacao" element={<Avaliacao />} />
-          </>
-        ) : (
-          // Redirect to login if not authenticated
-          <Route path="*" element={<Navigate to="/" replace />} />
-        )}
-      </Routes>
-    </Suspense>
+          {/* Protected Routes */}
+          {user ? (
+            <>
+              <Route path="/eventos" element={<Eventos />} />
+              <Route path="/criar-evento" element={<CriarEvento />} />
+              <Route path="/editar-evento/:id" element={<EditarEvento />} />
+              <Route path="/feed" element={<Feed />} />
+              <Route path="/mapa" element={<Mapa />} />
+              <Route path="/notificacoes" element={<Notificacoes />} />
+              <Route path="/destaques" element={<Destaques />} />
+              <Route path="/eventos-populares" element={<EventosPopulares />} />
+              <Route path="/perfil" element={<Perfil />} />
+              <Route path="/perfil/:id" element={<Perfil />} />
+              <Route path="/ingressos" element={<Ingressos />} />
+              <Route path="/search" element={<Search />} />
+              
+              {/* Configurações Routes */}
+              <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/configuracoes/perfil" element={<EditarPerfil />} />
+              <Route path="/configuracoes/notificacoes" element={<ConfiguracoesNotificacoes />} />
+              <Route path="/configuracoes/pagamento" element={<FormasPagamento />} />
+              <Route path="/gerenciar-eventos" element={<GerenciarEventos />} />
+              <Route path="/evento/:id/resultados" element={<ResultadosEvento />} />
+              
+              {/* Evento e Compra Routes */}
+              <Route path="/evento/:id" element={<DetalhesEvento />} />
+              <Route path="/compra-ingresso/escolha-ingresso" element={<EscolhaIngresso />} />
+              <Route path="/compra-ingresso/dados-comprador" element={<DadosComprador />} />
+              <Route path="/compra-ingresso/pagamento" element={<Pagamento />} />
+              <Route path="/compra-ingresso/cadastro-cartao" element={<CadastroCartao />} />
+              <Route path="/compra-ingresso/resumo" element={<Resumo />} />
+              <Route path="/compra-ingresso/status" element={<Status />} />
+              <Route path="/compra-ingresso/ingresso" element={<Ingresso />} />
+              <Route path="/compra-ingresso/cancelar" element={<CancelarReserva />} />
+              <Route path="/compra-ingresso/avaliacao" element={<Avaliacao />} />
+            </>
+          ) : (
+            // Redirect to login if not authenticated
+            <Route path="*" element={<Navigate to="/" replace />} />
+          )}
+        </Routes>
+      </Suspense>
+    </NotificationProvider>
   );
 }
 
