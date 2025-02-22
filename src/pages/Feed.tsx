@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Loader } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Loader, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Navbar from '../components/Navbar';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
+import Navbar from '../components/Navbar';
+import ErrorFeedback from '../components/ErrorFeedback';
 
 interface Post {
   id: string;
@@ -24,6 +25,12 @@ interface Post {
   };
 }
 
+interface SearchResult {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+}
+
 function Feed() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -32,6 +39,10 @@ function Feed() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -114,167 +125,148 @@ function Feed() {
     }
   };
 
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setSearching(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .ilike('full_name', `%${query}%`)
+        .limit(10);
+
+      if (error) throw error;
+
+      setSearchResults(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar usuários:', error);
+      toast.error('Erro ao buscar usuários');
+    } finally {
+      setSearching(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
-
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 p-4 text-center text-red-600 dark:text-red-400">
-          {error}
-          <button 
-            onClick={() => loadPosts(true)}
-            className="ml-2 underline"
-          >
-            Tentar novamente
-          </button>
+      
+      {/* Header do Feed */}
+      <div className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-screen-sm mx-auto px-4 py-3 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Feed</h1>
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/search')}
+              className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 
+                       dark:hover:bg-gray-800 rounded-full"
+              aria-label="Buscar"
+            >
+              <Search size={20} />
+            </button>
+          </div>
         </div>
-      )}
+      </div>
 
-      <div 
-        className="flex-1 overflow-y-auto no-scrollbar pb-16 max-w-xl mx-auto w-full"
-        onScroll={(e) => {
-          const target = e.target as HTMLDivElement;
-          const bottom = target.scrollHeight - target.scrollTop === target.clientHeight;
-          if (bottom && !loading && hasMore) {
-            loadPosts();
-          }
-        }}
-      >
-        {loading && posts.length === 0 ? (
-          // Loading skeleton
-          Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="border-b border-gray-200 dark:border-gray-800 animate-pulse">
-              <div className="p-3 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700" />
-                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-              </div>
-              <div className="aspect-square bg-gray-200 dark:bg-gray-700" />
-              <div className="p-3">
-                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
-                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
-              </div>
-            </div>
-          ))
-        ) : (
-          posts.map(post => (
-            <div key={post.id} className="border-b border-gray-200 dark:border-gray-800">
-              {/* Header */}
-              <div className="flex items-center justify-between p-3">
-                <div 
-                  className="flex items-center gap-2 cursor-pointer"
-                  onClick={() => navigate(`/perfil/${post.id}`)}
-                >
-                  <div className="w-8 h-8 rounded-full overflow-hidden">
-                    <img
-                      src={post.user_avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user_full_name)}&background=6366f1&color=fff`}
-                      alt={post.user_full_name}
-                      className="w-full h-full object-cover"
-                    />
+      {/* Conteúdo Principal */}
+      <main className="max-w-screen-sm mx-auto px-4 py-6">
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center items-center py-8">
+            <Loader className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && <ErrorFeedback message={error} />}
+
+        {/* Empty state */}
+        {!loading && !error && posts.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-600 dark:text-gray-400">
+              Nenhum post encontrado. Siga outros usuários para ver seus posts aqui!
+            </p>
+          </div>
+        )}
+
+        {/* Posts */}
+        <div className="space-y-6">
+          {posts.map(post => (
+            <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+              {/* Header do Post */}
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={post.user_avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user_full_name)}&background=random`}
+                    alt={post.user_full_name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white">
+                      {post.user_full_name}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {formatDistanceToNow(new Date(post.created_at), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })}
+                    </p>
                   </div>
-                  <span className="font-medium text-sm text-gray-900 dark:text-white">
-                    {post.user_full_name}
-                  </span>
                 </div>
-                <button className="p-2 text-gray-600 dark:text-gray-400">
-                  <MoreHorizontal className="w-5 h-5" />
+                <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                  <MoreHorizontal size={20} />
                 </button>
               </div>
 
-              {/* Image */}
-              <div 
-                className="relative aspect-square"
-                onDoubleClick={() => handleDoubleClick(post.id)}
-              >
+              {/* Imagem do Post */}
+              <div className="aspect-square relative">
                 <img
                   src={post.image_url}
                   alt="Post"
-                  className="w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover"
                 />
               </div>
 
-              {/* Actions */}
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => handleToggleLike(post.id)}
-                      className={`${post.is_liked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`}
-                    >
-                      <Heart className={`w-6 h-6 ${post.is_liked ? 'fill-current' : ''}`} />
-                    </button>
-                    <button className="text-gray-600 dark:text-gray-400">
-                      <MessageCircle className="w-6 h-6" />
-                    </button>
-                    <button className="text-gray-600 dark:text-gray-400">
-                      <Share2 className="w-6 h-6" />
-                    </button>
-                  </div>
-                  <button className="text-gray-600 dark:text-gray-400">
-                    <Bookmark className="w-6 h-6" />
+              {/* Ações do Post */}
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => handleToggleLike(post.id)}
+                    className={`${post.is_liked ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'} hover:text-red-500 dark:hover:text-red-400`}
+                  >
+                    <Heart size={24} />
+                  </button>
+                  <button className="text-gray-500 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400">
+                    <MessageCircle size={24} />
+                  </button>
+                  <button className="text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400">
+                    <Share2 size={24} />
                   </button>
                 </div>
+                <button className="text-gray-500 dark:text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400">
+                  <Bookmark size={24} />
+                </button>
+              </div>
 
-                {/* Likes count */}
-                <p className="font-medium text-sm text-gray-900 dark:text-white mb-1">
-                  {post.likes_count} curtidas
-                </p>
-
-                {/* Caption */}
-                {post.caption && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+              {/* Descrição do Post */}
+              {post.caption && (
+                <div className="px-4 pb-4">
+                  <p className="text-gray-900 dark:text-white">
                     <span className="font-medium text-gray-900 dark:text-white mr-2">
                       {post.user_full_name}
                     </span>
                     {post.caption}
                   </p>
-                )}
-
-                {/* Comments preview */}
-                {post.latest_comment && (
-                  <div className="px-3 pb-2">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-medium text-gray-900 dark:text-white mr-2">
-                        {post.latest_comment.user_full_name}
-                      </span>
-                      {post.latest_comment.content}
-                    </p>
-                    {post.comments_count > 1 && (
-                      <button className="text-sm text-gray-500 dark:text-gray-500">
-                        Ver todos os {post.comments_count} comentários
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Date */}
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 px-3 pb-3">
-                  {formatDistanceToNow(new Date(post.created_at), { 
-                    addSuffix: true,
-                    locale: ptBR 
-                  })}
-                </p>
-              </div>
+                </div>
+              )}
             </div>
-          ))
-        )}
-
-        {loading && posts.length > 0 && (
-          <div className="flex justify-center py-8">
-            <Loader className="w-8 h-8 text-purple-600 animate-spin" />
-          </div>
-        )}
-
-        {!loading && posts.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Nenhuma postagem encontrada no seu feed
-            </p>
-            <p className="text-sm text-gray-400 dark:text-gray-500">
-              Siga mais pessoas para ver suas postagens aqui
-            </p>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }

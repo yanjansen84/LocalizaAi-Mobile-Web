@@ -9,6 +9,7 @@ import { useTheme } from '../ThemeProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import toast from 'react-hot-toast'; // Import toast
 
 interface UserProfile {
   full_name: string;
@@ -52,9 +53,11 @@ function Configuracoes() {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
-      navigate('/');
+      navigate('/login');
+      toast.success('Você saiu com sucesso');
     } catch (error) {
       console.error('Erro ao sair:', error);
+      toast.error('Erro ao sair da conta');
     }
   };
 
@@ -270,6 +273,18 @@ function Configuracoes() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Botão de Sair */}
+        <div className="p-4">
+          <button
+            onClick={handleSignOut}
+            className="w-full p-4 bg-red-50 dark:bg-red-900/20 rounded-xl flex items-center gap-3 
+                     transition-colors active:bg-red-100 dark:active:bg-red-900/30"
+          >
+            <LogOut className="w-5 h-5 text-red-600" />
+            <span className="text-red-600">Sair da Conta</span>
+          </button>
         </div>
 
         {/* Navbar */}

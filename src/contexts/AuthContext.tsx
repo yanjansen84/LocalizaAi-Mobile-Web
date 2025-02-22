@@ -71,15 +71,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!data.user) throw new Error('Dados do usuário não retornados');
 
       // Criar perfil do usuário
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: data.user.id,
-            email: email,
-            full_name: fullName
-          }
-        ]);
+      const { error: profileError } = await supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (!session) throw new Error('Sessão não encontrada');
+        
+        return await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              full_name: fullName
+            }
+          ])
+          .select()
+          .single();
+      });
 
       if (profileError) throw profileError;
 

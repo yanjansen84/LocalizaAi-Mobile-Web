@@ -31,6 +31,7 @@ import Avaliacao from './pages/CompraIngresso/Avaliacao';
 import Ingresso from './pages/CompraIngresso/Ingresso';
 import GerenciarEventos from './pages/GerenciarEventos';
 import ResultadosEvento from './pages/ResultadosEvento';
+import Search from './pages/Search';
 import { Toaster } from 'react-hot-toast';
 
 function LoadingScreen() {
@@ -70,6 +71,7 @@ function App() {
             <Route path="/eventos-populares" element={<EventosPopulares />} />
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/ingressos" element={<Ingressos />} />
+            <Route path="/search" element={<Search />} />
             
             {/* Configurações Routes */}
             <Route path="/configuracoes" element={<Configuracoes />} />

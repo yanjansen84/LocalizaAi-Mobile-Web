@@ -157,39 +157,55 @@ function Perfil() {
       
       const targetId = profileId || user.id;
       
-      // Carregar dados do perfil da tabela correta (profiles)
+      // Carregar dados do perfil
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url')
+        .select('id, full_name, avatar_url')  // Seleciona todos os campos
         .eq('id', targetId)
-        .single();
+        .maybeSingle();  // Usa maybeSingle ao invés de single para evitar erro
 
-      if (profileError) throw profileError;
-
-      // Se não for o próprio perfil, verificar se o usuário logado segue este perfil
-      if (!isOwnProfile) {
-        const { data: followData, error: followError } = await supabase
-          .from('followers')
-          .select('id')
-          .eq('follower_id', user.id)
-          .eq('followed_id', targetId)
-          .single();
-
-        if (followError && followError.code !== 'PGRST116') { // Ignora erro de não encontrado
-          throw followError;
-        }
-
-        profileData.is_following = !!followData;
+      if (profileError) {
+        console.error('Erro ao carregar perfil:', profileError);
+        return;
       }
 
-      // Adicionar contadores zerados por enquanto
-      profileData.followers_count = 0;
-      profileData.following_count = 0;
-      profileData.events_count = 0;
-      profileData.bio = null;
+      if (!profileData) {
+        // Se o perfil não existe, cria um novo
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: targetId,
+              full_name: user.user_metadata?.full_name || 'Usuário',
+              avatar_url: null
+            }
+          ])
+          .select('id, full_name, avatar_url')
+          .maybeSingle();
 
-      setProfile(profileData);
-      setPhotoKey(Date.now()); // Forçar atualização da imagem
+        if (insertError) {
+          console.error('Erro ao criar perfil:', insertError);
+          return;
+        }
+
+        setProfile({
+          ...(newProfile || {}),
+          followers_count: 0,
+          following_count: 0,
+          events_count: 0,
+          is_following: false
+        });
+        return;
+      }
+
+      // Se encontrou o perfil, adiciona os contadores
+      setProfile({
+        ...profileData,
+        followers_count: 0,
+        following_count: 0,
+        events_count: 0,
+        is_following: false
+      });
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
     } finally {

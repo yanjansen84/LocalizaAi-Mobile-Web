@@ -24,7 +24,7 @@ const errorTitles = {
   general: 'Erro',
 };
 
-export const ErrorFeedback: React.FC<ErrorFeedbackProps> = ({
+const ErrorFeedback: React.FC<ErrorFeedbackProps> = ({
   type = 'general',
   message,
   onRetry,
@@ -54,3 +54,5 @@ export const ErrorFeedback: React.FC<ErrorFeedbackProps> = ({
     </div>
   );
 };
+
+export default ErrorFeedback;
