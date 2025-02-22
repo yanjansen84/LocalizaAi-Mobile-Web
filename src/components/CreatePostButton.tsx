@@ -85,9 +85,11 @@ function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+        className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full 
+                 transition-colors flex items-center justify-center"
+        aria-label="Criar Post"
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="w-5 h-5" />
       </button>
 
       {isModalOpen && (
