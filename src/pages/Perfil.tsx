@@ -5,15 +5,38 @@ import {
   LogOut, Ticket, Loader, Camera, X
 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 
 interface UserProfile {
+  id: string;
   full_name: string;
   avatar_url: string | null;
-  bio?: string;
+  bio: string | null;
+  followers_count: number;
+  following_count: number;
+  events_count: number;
+  is_following?: boolean;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+  image_url: string;
+  is_free: boolean;
+}
+
+interface Post {
+  id: string;
+  image_url: string;
+  caption: string | null;
+  created_at: string;
+  likes_count: number;
+  is_liked: boolean;
 }
 
 function LogoutModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
@@ -48,15 +71,25 @@ function LogoutModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (
 }
 
 function Perfil() {
+  const { id: profileId } = useParams(); // ID do perfil sendo visualizado
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'eventos' | 'colecoes' | 'sobre'>('eventos');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoKey, setPhotoKey] = useState(0);
   const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postsPage, setPostsPage] = useState(1);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
 
   // Static data for events and collections
   const staticData = {
@@ -112,6 +145,8 @@ function Perfil() {
     ]
   };
 
+  const isOwnProfile = !profileId || (user && profileId === user.id);
+
   useEffect(() => {
     loadProfile();
   }, [user]);
@@ -119,20 +154,137 @@ function Perfil() {
   async function loadProfile() {
     try {
       if (!user) return;
-
-      const { data, error } = await supabase
+      
+      const targetId = profileId || user.id;
+      
+      // Primeiro, carregar dados do perfil
+      const { data: profileData, error: profileError } = await supabase
         .from('users')
-        .select('full_name, avatar_url, bio')
-        .eq('id', user.id)
+        .select('id, full_name, avatar_url, bio, followers_count, following_count, events_count')
+        .eq('id', targetId)
         .single();
 
-      if (error) throw error;
-      setProfile(data);
-      setPhotoKey(Date.now()); // Force image update
+      if (profileError) throw profileError;
+
+      // Se não for o próprio perfil, verificar se o usuário logado segue este perfil
+      if (!isOwnProfile) {
+        const { data: followData, error: followError } = await supabase
+          .from('followers')
+          .select('id')
+          .eq('follower_id', user.id)
+          .eq('following_id', targetId)
+          .single();
+
+        if (followError && followError.code !== 'PGRST116') { // Ignora erro de não encontrado
+          throw followError;
+        }
+
+        profileData.is_following = !!followData;
+      }
+
+      setProfile(profileData);
+      setPhotoKey(Date.now()); // Forçar atualização da imagem
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'eventos' && profile && events.length === 0) {
+      loadEvents(true);
+    }
+  }, [activeTab, profile]);
+
+  useEffect(() => {
+    if (activeTab === 'colecoes' && profile && posts.length === 0) {
+      loadPosts(true);
+    }
+  }, [activeTab, profile]);
+
+  async function loadEvents(refresh = false) {
+    try {
+      if (!profile || loadingEvents || (!hasMore && !refresh)) return;
+
+      if (refresh) {
+        setPage(1);
+        setEvents([]);
+        setHasMore(true);
+      }
+
+      setLoadingEvents(true);
+      
+      // Buscar eventos que o usuário se inscreveu
+      const { data, error } = await supabase
+        .from('events')
+        .select(`
+          id,
+          title,
+          date,
+          location,
+          image_url,
+          is_free
+        `)
+        .eq('id', supabase.from('event_registrations').select('event_id').eq('user_id', profile.id))
+        .range((page - 1) * 10, page * 10 - 1)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setEvents(prev => refresh ? data : [...prev, ...data]);
+        setHasMore(data.length === 10);
+        if (!refresh) setPage(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar eventos:', error);
+    } finally {
+      setLoadingEvents(false);
+    }
+  }
+
+  async function loadPosts(refresh = false) {
+    try {
+      if (!profile || loadingPosts || (!hasMorePosts && !refresh)) return;
+
+      if (refresh) {
+        setPostsPage(1);
+        setPosts([]);
+        setHasMorePosts(true);
+      }
+
+      setLoadingPosts(true);
+      
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          id,
+          image_url,
+          caption,
+          created_at,
+          likes_count,
+          post_likes!inner(id)
+        `)
+        .eq('user_id', profile.id)
+        .eq('post_likes.user_id', user?.id)
+        .range((postsPage - 1) * 12, postsPage * 12 - 1)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const postsWithLikes = data?.map(post => ({
+        ...post,
+        is_liked: post.post_likes?.length > 0
+      })) || [];
+
+      setPosts(prev => refresh ? postsWithLikes : [...prev, ...postsWithLikes]);
+      setHasMorePosts(data?.length === 12);
+      if (!refresh) setPostsPage(prev => prev + 1);
+    } catch (error) {
+      console.error('Erro ao carregar posts:', error);
+    } finally {
+      setLoadingPosts(false);
     }
   }
 
@@ -187,6 +339,87 @@ function Perfil() {
     }
   };
 
+  const handleFollow = async () => {
+    if (!user || !profile || followLoading) return;
+    
+    try {
+      setFollowLoading(true);
+      
+      if (profile.is_following) {
+        // Deixar de seguir
+        const { error } = await supabase
+          .from('followers')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', profile.id);
+
+        if (error) throw error;
+
+        setProfile(prev => prev ? {
+          ...prev,
+          is_following: false,
+          followers_count: prev.followers_count - 1
+        } : null);
+      } else {
+        // Seguir
+        const { error } = await supabase
+          .from('followers')
+          .insert({
+            follower_id: user.id,
+            following_id: profile.id
+          });
+
+        if (error) throw error;
+
+        setProfile(prev => prev ? {
+          ...prev,
+          is_following: true,
+          followers_count: prev.followers_count + 1
+        } : null);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar follow:', error);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleToggleLike = async (postId: string) => {
+    try {
+      const post = posts.find(p => p.id === postId);
+      if (!post || !user) return;
+
+      if (post.is_liked) {
+        // Remover like
+        const { error } = await supabase
+          .from('post_likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('post_id', postId);
+
+        if (error) throw error;
+      } else {
+        // Adicionar like
+        const { error } = await supabase
+          .from('post_likes')
+          .insert({ user_id: user.id, post_id: postId });
+
+        if (error) throw error;
+      }
+
+      // Atualizar estado local
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? {
+          ...p,
+          is_liked: !p.is_liked,
+          likes_count: p.likes_count + (p.is_liked ? -1 : 1)
+        } : p
+      ));
+    } catch (error) {
+      console.error('Erro ao atualizar like:', error);
+    }
+  };
+
   const getPhotoUrl = () => {
     if (!profile?.avatar_url) {
       return `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || 'User')}&background=6366f1&color=fff`;
@@ -219,7 +452,18 @@ function Perfil() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto no-scrollbar pb-16">
+        <div className="flex-1 overflow-y-auto no-scrollbar pb-16" 
+          onScroll={(e) => {
+            const target = e.target as HTMLDivElement;
+            const bottom = target.scrollHeight - target.scrollTop === target.clientHeight;
+            if (bottom && !loadingEvents && hasMore && activeTab === 'eventos') {
+              loadEvents();
+            }
+            if (bottom && !loadingPosts && hasMorePosts && activeTab === 'colecoes') {
+              loadPosts();
+            }
+          }}
+        >
           {/* Profile Info */}
           <div className="px-6 pt-4">
             <div className="flex flex-col items-center">
@@ -241,33 +485,56 @@ function Perfil() {
                     />
                   )}
                 </div>
-                <label className="absolute bottom-4 right-0 w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleUploadAvatar}
-                    disabled={uploadingPhoto}
-                    className="hidden"
-                  />
-                  <Camera className="w-4 h-4 text-white" />
-                </label>
+                {isOwnProfile && (
+                  <label className="absolute bottom-4 right-0 w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadAvatar}
+                      disabled={uploadingPhoto}
+                      className="hidden"
+                    />
+                    <Camera className="w-4 h-4 text-white" />
+                  </label>
+                )}
               </div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 {profile?.full_name}
               </h2>
+
+              {/* Botão Seguir - só aparece se não for o próprio perfil */}
+              {!isOwnProfile && profile && (
+                <button
+                  onClick={handleFollow}
+                  disabled={followLoading}
+                  className={`mb-6 px-6 py-2 rounded-full text-sm font-medium transition-colors ${
+                    profile.is_following
+                      ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                  }`}
+                >
+                  {followLoading ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : profile.is_following ? (
+                    'Seguindo'
+                  ) : (
+                    'Seguir'
+                  )}
+                </button>
+              )}
 
               {/* Stats */}
               <div className="flex justify-center gap-8 mb-6">
                 <div className="text-center">
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">12</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{profile?.events_count || 0}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Eventos</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">7.389</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{profile?.followers_count}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Seguidores</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">125</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{profile?.following_count}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Seguindo</p>
                 </div>
               </div>
@@ -312,18 +579,19 @@ function Perfil() {
           <div className="px-4 pt-4">
             {activeTab === 'eventos' && (
               <div className="space-y-4">
-                {staticData.events.map(event => (
+                {events.map(event => (
                   <div
                     key={event.id}
-                    className="flex gap-3 items-center bg-gray-100 dark:bg-gray-800 p-3 rounded-xl"
+                    className="flex gap-3 items-center bg-gray-100 dark:bg-gray-800 p-3 rounded-xl transform transition-transform active:scale-98 cursor-pointer"
+                    onClick={() => navigate(`/evento/${event.id}`)}
                   >
                     <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
                       <img
-                        src={event.image}
+                        src={event.image_url}
                         alt={event.title}
                         className="w-full h-full object-cover"
                       />
-                      {event.isFree && (
+                      {event.is_free && (
                         <span className="absolute top-1 left-1 bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                           Grátis
                         </span>
@@ -342,32 +610,98 @@ function Perfil() {
                         <span className="truncate">{event.location}</span>
                       </div>
                     </div>
-                    <button className="p-2 text-gray-400 dark:text-gray-600 hover:text-purple-600 dark:hover:text-purple-500">
-                      <Heart className="w-5 h-5" />
-                    </button>
                   </div>
                 ))}
+                
+                {loadingEvents && (
+                  <div className="flex justify-center py-4">
+                    <Loader className="w-6 h-6 text-purple-600 animate-spin" />
+                  </div>
+                )}
+
+                {!loadingEvents && events.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 dark:text-gray-400 mb-4">
+                      Nenhum evento encontrado
+                    </p>
+                    <button
+                      onClick={() => navigate('/eventos')}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-full text-sm hover:bg-purple-700 transition-colors"
+                    >
+                      Explorar Eventos
+                    </button>
+                  </div>
+                )}
+
+                {!loadingEvents && !hasMore && events.length > 0 && (
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                    Não há mais eventos para carregar
+                  </p>
+                )}
               </div>
             )}
 
             {activeTab === 'colecoes' && (
-              <div className="grid grid-cols-3 gap-1">
-                {staticData.collections.map(collection => (
-                  <div key={collection.id} className="relative aspect-square">
-                    <img
-                      src={collection.image}
-                      alt="Coleção"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
-                      <div className="flex items-center text-white">
-                        <Heart className="w-4 h-4 fill-white text-white mr-1" />
-                        <span className="text-sm">{collection.likes}</span>
+              <>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => navigate('/novo-post')}
+                    className="mx-4 mb-4 py-2 bg-purple-600 text-white rounded-full text-sm font-medium hover:bg-purple-700 transition-colors"
+                  >
+                    Criar Nova Postagem
+                  </button>
+                )}
+                
+                <div className="grid grid-cols-3 gap-[2px]">
+                  {posts.map(post => (
+                    <div 
+                      key={post.id}
+                      className="relative aspect-square group cursor-pointer"
+                      onClick={() => navigate(`/post/${post.id}`)}
+                    >
+                      <img
+                        src={post.image_url}
+                        alt="Post"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <div className="flex items-center text-white">
+                          <Heart className={`w-5 h-5 ${post.is_liked ? 'fill-white' : ''} text-white mr-1`} />
+                          <span className="text-sm font-medium">{post.likes_count}</span>
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+
+                {loadingPosts && (
+                  <div className="flex justify-center py-4">
+                    <Loader className="w-6 h-6 text-purple-600 animate-spin" />
                   </div>
-                ))}
-              </div>
+                )}
+
+                {!loadingPosts && posts.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 dark:text-gray-400 mb-4">
+                      Nenhuma postagem encontrada
+                    </p>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => navigate('/novo-post')}
+                        className="bg-purple-600 text-white px-6 py-2 rounded-full text-sm hover:bg-purple-700 transition-colors"
+                      >
+                        Criar Primeira Postagem
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {!loadingPosts && !hasMorePosts && posts.length > 0 && (
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                    Não há mais postagens para carregar
+                  </p>
+                )}
+              </>
             )}
 
             {activeTab === 'sobre' && (

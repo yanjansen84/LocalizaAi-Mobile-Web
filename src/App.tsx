@@ -31,6 +31,7 @@ import Avaliacao from './pages/CompraIngresso/Avaliacao';
 import Ingresso from './pages/CompraIngresso/Ingresso';
 import GerenciarEventos from './pages/GerenciarEventos';
 import ResultadosEvento from './pages/ResultadosEvento';
+import { Toaster } from 'react-hot-toast';
 
 function LoadingScreen() {
   return (
@@ -49,6 +50,7 @@ function App() {
 
   return (
     <Suspense fallback={<LoadingScreen />}>
+      <Toaster position="top-center" />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Login /> : <Navigate to="/eventos" replace />} />

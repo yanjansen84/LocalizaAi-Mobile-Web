@@ -1,169 +1,293 @@
-import React from 'react';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Loader } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { toast } from 'react-hot-toast';
+
+interface Post {
+  id: string;
+  image_url: string;
+  caption: string | null;
+  created_at: string;
+  user_full_name: string;
+  user_avatar_url: string | null;
+  likes_count: number;
+  is_liked: boolean;
+  comments_count: number;
+  latest_comment?: {
+    user_full_name: string;
+    content: string;
+  };
+}
 
 function Feed() {
-  const stories = [
-    { id: 1, name: 'Rock SP', image: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=300&h=300&fit=crop' },
-    { id: 2, name: 'Teatro', image: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=300&h=300&fit=crop' },
-    { id: 3, name: 'Festival', image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=300&h=300&fit=crop' },
-    { id: 4, name: 'Arte', image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=300&h=300&fit=crop' },
-  ];
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const posts = [
-    {
-      id: 1,
-      user: {
-        name: 'Festival de Música SP',
-        avatar: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=50&h=50&fit=crop',
-        verified: true
-      },
-      image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=600&h=600&fit=crop',
-      likes: 1234,
-      description: 'Prepare-se para a maior festa do ano! 🎉 O Festival de Música SP está chegando com muitas atrações incríveis! #FestivalSP #Música',
-      comments: 89,
-      time: '2 horas'
-    },
-    {
-      id: 2,
-      user: {
-        name: 'Teatro Municipal',
-        avatar: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=50&h=50&fit=crop',
-        verified: true
-      },
-      image: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=600&h=600&fit=crop',
-      likes: 856,
-      description: 'Nova temporada de apresentações começando! 🎭 Não perca os espetáculos mais aguardados do ano. #TeatroSP #Cultura',
-      comments: 45,
-      time: '5 horas'
+  useEffect(() => {
+    if (user) {
+      loadPosts(true);
     }
-  ];
+  }, [user]);
+
+  async function loadPosts(refresh = false) {
+    try {
+      if (!user || (!hasMore && !refresh)) return;
+
+      if (refresh) {
+        setPage(1);
+        setPosts([]);
+        setHasMore(true);
+      }
+
+      setLoading(true);
+      setError(null);
+
+      // Tentativa 1: Usando o nome completo da função
+      const { data, error } = await supabase.rpc('public.get_user_feed', {
+        p_user_id: user.id  // Garantindo que o nome do parâmetro está correto
+      });
+
+      // Se a primeira tentativa falhar, tente a segunda
+      if (error && error.message.includes('function not found')) {
+        const { data: data2, error: error2 } = await supabase.rpc('get_user_feed', {
+          p_user_id: user.id
+        });
+        
+        if (error2) throw error2;
+        if (data2) {
+          setPosts(prev => refresh ? data2 : [...prev, ...data2]);
+          setHasMore(data2.length === 10);
+          if (!refresh) setPage(prev => prev + 1);
+        }
+      } else {
+        if (error) throw error;
+        if (data) {
+          setPosts(prev => refresh ? data : [...prev, ...data]);
+          setHasMore(data.length === 10);
+          if (!refresh) setPage(prev => prev + 1);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar feed:', error);
+      setError('Não foi possível carregar o feed. Tente novamente mais tarde.');
+      toast.error('Erro ao carregar feed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleToggleLike = async (postId: string) => {
+    try {
+      const post = posts.find(p => p.id === postId);
+      if (!post || !user) return;
+
+      if (post.is_liked) {
+        // Remover like
+        const { error } = await supabase
+          .from('post_likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('post_id', postId);
+
+        if (error) throw error;
+      } else {
+        // Adicionar like
+        const { error } = await supabase
+          .from('post_likes')
+          .insert({ user_id: user.id, post_id: postId });
+
+        if (error) throw error;
+      }
+
+      // Atualizar estado local
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? {
+          ...p,
+          is_liked: !p.is_liked,
+          likes_count: p.likes_count + (p.is_liked ? -1 : 1)
+        } : p
+      ));
+    } catch (error) {
+      console.error('Erro ao atualizar like:', error);
+    }
+  };
+
+  const handleDoubleClick = async (postId: string) => {
+    if (!posts.find(p => p.id === postId)?.is_liked) {
+      await handleToggleLike(postId);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 overflow-hidden">
-      <div className="h-screen flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Feed</h1>
-            <button className="p-2 text-gray-600 dark:text-gray-400">
-              <Share2 className="w-6 h-6" />
-            </button>
-          </div>
+    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-900">
+      <Navbar />
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 p-4 text-center text-red-600 dark:text-red-400">
+          {error}
+          <button 
+            onClick={() => loadPosts(true)}
+            className="ml-2 underline"
+          >
+            Tentar novamente
+          </button>
         </div>
+      )}
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">
-          {/* Stories */}
-          <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-800">
-            <div className="flex space-x-4 overflow-x-auto no-scrollbar">
-              {stories.map(story => (
-                <div key={story.id} className="flex flex-col items-center space-y-1 flex-shrink-0">
-                  <div className="w-16 h-16 rounded-full ring-2 ring-purple-600 p-1">
-                    <img
-                      src={story.image}
-                      alt={story.name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  </div>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">{story.name}</span>
-                </div>
-              ))}
+      <div 
+        className="flex-1 overflow-y-auto no-scrollbar pb-16 max-w-xl mx-auto w-full"
+        onScroll={(e) => {
+          const target = e.target as HTMLDivElement;
+          const bottom = target.scrollHeight - target.scrollTop === target.clientHeight;
+          if (bottom && !loading && hasMore) {
+            loadPosts();
+          }
+        }}
+      >
+        {loading && posts.length === 0 ? (
+          // Loading skeleton
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="border-b border-gray-200 dark:border-gray-800 animate-pulse">
+              <div className="p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700" />
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+              <div className="aspect-square bg-gray-200 dark:bg-gray-700" />
+              <div className="p-3">
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
             </div>
-          </div>
-
-          {/* Posts */}
-          <div className="pb-16">
-            {posts.map(post => (
-              <div key={post.id} className="border-b border-gray-200 dark:border-gray-800">
-                {/* Post Header */}
-                <div className="flex items-center justify-between p-4">
-                  <div className="flex items-center space-x-2">
+          ))
+        ) : (
+          posts.map(post => (
+            <div key={post.id} className="border-b border-gray-200 dark:border-gray-800">
+              {/* Header */}
+              <div className="flex items-center justify-between p-3">
+                <div 
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={() => navigate(`/perfil/${post.id}`)}
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden">
                     <img
-                      src={post.user.avatar}
-                      alt={post.user.name}
-                      className="w-8 h-8 rounded-full"
+                      src={post.user_avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user_full_name)}&background=6366f1&color=fff`}
+                      alt={post.user_full_name}
+                      className="w-full h-full object-cover"
                     />
-                    <div>
-                      <div className="flex items-center">
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {post.user.name}
-                        </span>
-                        {post.user.verified && (
-                          <span className="ml-1 text-purple-600">•</span>
-                        )}
-                      </div>
-                    </div>
                   </div>
-                  <button className="text-gray-600 dark:text-gray-400">
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
+                  <span className="font-medium text-sm text-gray-900 dark:text-white">
+                    {post.user_full_name}
+                  </span>
                 </div>
+                <button className="p-2 text-gray-600 dark:text-gray-400">
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
+              </div>
 
-                {/* Post Image */}
-                <div className="relative">
-                  <img
-                    src={post.image}
-                    alt="Post"
-                    className="w-full object-cover"
-                  />
-                </div>
+              {/* Image */}
+              <div 
+                className="relative aspect-square"
+                onDoubleClick={() => handleDoubleClick(post.id)}
+              >
+                <img
+                  src={post.image_url}
+                  alt="Post"
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
-                {/* Post Actions */}
-                <div className="p-4">
-                  <div className="flex justify-between mb-4">
-                    <div className="flex space-x-4">
-                      <button className="text-gray-600 dark:text-gray-400 hover:text-red-500">
-                        <Heart className="w-6 h-6" />
-                      </button>
-                      <button className="text-gray-600 dark:text-gray-400">
-                        <MessageCircle className="w-6 h-6" />
-                      </button>
-                      <button className="text-gray-600 dark:text-gray-400">
-                        <Share2 className="w-6 h-6" />
-                      </button>
-                    </div>
+              {/* Actions */}
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => handleToggleLike(post.id)}
+                      className={`${post.is_liked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`}
+                    >
+                      <Heart className={`w-6 h-6 ${post.is_liked ? 'fill-current' : ''}`} />
+                    </button>
                     <button className="text-gray-600 dark:text-gray-400">
-                      <Bookmark className="w-6 h-6" />
+                      <MessageCircle className="w-6 h-6" />
+                    </button>
+                    <button className="text-gray-600 dark:text-gray-400">
+                      <Share2 className="w-6 h-6" />
                     </button>
                   </div>
-
-                  {/* Likes */}
-                  <div className="mb-2">
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {post.likes.toLocaleString()} curtidas
-                    </span>
-                  </div>
-
-                  {/* Description */}
-                  <div className="mb-2">
-                    <span className="font-semibold text-gray-900 dark:text-white mr-2">
-                      {post.user.name}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400">
-                      {post.description}
-                    </span>
-                  </div>
-
-                  {/* Comments */}
-                  <button className="text-gray-500 text-sm">
-                    Ver todos os {post.comments} comentários
+                  <button className="text-gray-600 dark:text-gray-400">
+                    <Bookmark className="w-6 h-6" />
                   </button>
-
-                  {/* Time */}
-                  <div className="mt-2">
-                    <span className="text-xs text-gray-500">
-                      Há {post.time}
-                    </span>
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Navbar */}
-        <Navbar />
+                {/* Likes count */}
+                <p className="font-medium text-sm text-gray-900 dark:text-white mb-1">
+                  {post.likes_count} curtidas
+                </p>
+
+                {/* Caption */}
+                {post.caption && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <span className="font-medium text-gray-900 dark:text-white mr-2">
+                      {post.user_full_name}
+                    </span>
+                    {post.caption}
+                  </p>
+                )}
+
+                {/* Comments preview */}
+                {post.latest_comment && (
+                  <div className="px-3 pb-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-900 dark:text-white mr-2">
+                        {post.latest_comment.user_full_name}
+                      </span>
+                      {post.latest_comment.content}
+                    </p>
+                    {post.comments_count > 1 && (
+                      <button className="text-sm text-gray-500 dark:text-gray-500">
+                        Ver todos os {post.comments_count} comentários
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Date */}
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 px-3 pb-3">
+                  {formatDistanceToNow(new Date(post.created_at), { 
+                    addSuffix: true,
+                    locale: ptBR 
+                  })}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+
+        {loading && posts.length > 0 && (
+          <div className="flex justify-center py-8">
+            <Loader className="w-8 h-8 text-purple-600 animate-spin" />
+          </div>
+        )}
+
+        {!loading && posts.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Nenhuma postagem encontrada no seu feed
+            </p>
+            <p className="text-sm text-gray-400 dark:text-gray-500">
+              Siga mais pessoas para ver suas postagens aqui
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
