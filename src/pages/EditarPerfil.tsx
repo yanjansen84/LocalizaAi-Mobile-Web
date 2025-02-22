@@ -39,21 +39,20 @@ function EditarPerfil() {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('users')
-        .select('*')
+        .from('profiles')
+        .select('full_name, phone, birth_date, country, bio, avatar_url')
         .eq('id', user.id)
         .single();
 
       if (error) throw error;
 
       setFormData({
-        full_name: data.full_name || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        birth_date: data.birth_date || '',
-        country: data.country || 'Brasil',
-        bio: data.bio || '',
-        avatar_url: data.avatar_url
+        ...data,
+        email: user.email || '',
+        phone: data?.phone || '',
+        birth_date: data?.birth_date || '',
+        country: data?.country || 'Brasil',
+        bio: data?.bio || '',
       });
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
@@ -68,7 +67,7 @@ function EditarPerfil() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { error } = await supabase
-        .from('users')
+        .from('profiles')
         .update({
           full_name: formData.full_name,
           phone: formData.phone,
@@ -80,7 +79,6 @@ function EditarPerfil() {
 
       if (error) throw error;
 
-      // Return to profile page instead of settings
       navigate('/perfil');
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);

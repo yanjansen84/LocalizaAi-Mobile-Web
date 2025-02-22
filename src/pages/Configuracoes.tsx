@@ -36,13 +36,17 @@ function Configuracoes() {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('users')
-        .select('full_name, avatar_url, email, bio')
+        .from('profiles')
+        .select('full_name, avatar_url, bio')
         .eq('id', user.id)
         .single();
 
       if (error) throw error;
-      setProfile(data);
+      
+      setProfile({
+        ...data,
+        email: user.email || ''
+      });
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
     } finally {
