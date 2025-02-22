@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Bell, MoreVertical } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 interface Notification {
   id: number;
@@ -13,6 +13,7 @@ interface Notification {
 }
 
 function Notificacoes() {
+  const navigate = useNavigate();
   const [hasNotifications, setHasNotifications] = React.useState(true);
 
   const notifications: Notification[] = [
@@ -69,9 +70,12 @@ function Notificacoes() {
       <div className="p-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/eventos" className="text-gray-700 dark:text-gray-300">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="text-gray-700 dark:text-gray-300"
+            >
               <ArrowLeft className="w-6 h-6" />
-            </Link>
+            </button>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
               Notificações
             </h1>
