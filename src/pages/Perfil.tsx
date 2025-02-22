@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import { toast } from 'react-hot-toast';
+import ImageCropModal from '../components/ImageCropModal';
 
 interface UserProfile {
   id: string;
@@ -84,6 +85,8 @@ function Perfil() {
   const [activeTab, setActiveTab] = useState<'eventos' | 'colecoes' | 'sobre'>('eventos');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoKey, setPhotoKey] = useState(0);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [tempImageUrl, setTempImageUrl] = useState<string>('');
   const { theme, toggleTheme } = useTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
@@ -358,45 +361,70 @@ function Perfil() {
     }
   };
 
-  const handleUploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (!event.target.files || !event.target.files[0] || !user) return;
       
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      setUploadingPhoto(true);
-
-      // Remove old avatar if exists
-      if (profile?.avatar_url) {
-        const oldPath = profile.avatar_url.split('/').pop();
-        if (oldPath) {
-          await supabase.storage.from('avatars').remove([`${user.id}/${oldPath}`]);
-        }
+      
+      // Verificar se é uma imagem
+      if (!file.type.startsWith('image/')) {
+        toast.error('Por favor, selecione uma imagem válida');
+        return;
       }
+      
+      const imageUrl = URL.createObjectURL(file);
+      setTempImageUrl(imageUrl);
+      setShowCropModal(true);
+    } catch (error) {
+      console.error('Erro ao abrir modal de corte:', error);
+      toast.error('Erro ao processar a imagem');
+    }
+  };
 
-      // Upload new avatar
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+  const handleCropSave = async (croppedImage: Blob) => {
+    if (!user) return;
+
+    try {
+      setUploadingPhoto(true);
+      setShowCropModal(false);
+
+      // Upload da imagem cortada na pasta do usuário
+      const fileName = `${user.id}/${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, croppedImage);
+
       if (uploadError) throw uploadError;
 
-      // Obter a URL pública corretamente
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      if (!data.publicUrl) throw new Error('Erro ao obter URL pública');
+      // Obter a URL pública da imagem
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
 
-      // Atualizar o perfil com a URL pública
-      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id);
+      if (!publicUrl) throw new Error('Erro ao obter URL pública');
+
+      // Atualizar o perfil do usuário com a URL pública
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
       if (updateError) throw updateError;
 
-      // Atualizar o estado do perfil
-      setProfile(prev => prev ? { ...prev, avatar_url: data.publicUrl } : null);
-      setPhotoKey(Date.now()); // Forçar atualização da imagem no front
+      // Atualizar o estado local do perfil
+      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+      
+      // Forçar atualização da imagem
+      setPhotoKey(prev => prev + 1);
+      toast.success('Foto de perfil atualizada com sucesso!');
     } catch (error) {
-      console.error('Erro ao fazer upload da foto:', error);
-      alert('Erro ao fazer upload da foto. Por favor, tente novamente.');
+      console.error('Erro ao atualizar foto:', error);
+      toast.error('Erro ao atualizar foto de perfil');
     } finally {
       setUploadingPhoto(false);
+      URL.revokeObjectURL(tempImageUrl);
+      setTempImageUrl('');
     }
   };
 
@@ -566,15 +594,15 @@ function Perfil() {
                   )}
                 </div>
                 {isOwnProfile && (
-                  <label className="absolute bottom-4 right-0 w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer">
+                  <label className="absolute bottom-4 right-0 w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-purple-700 transition-colors">
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={handleUploadAvatar}
+                      onChange={handleFileChange}
                       disabled={uploadingPhoto}
                       className="hidden"
                     />
-                    <Camera className="w-4 h-4 text-white" />
+                    <Camera className="w-5 h-5 text-white" />
                   </label>
                 )}
               </div>
@@ -804,6 +832,18 @@ function Perfil() {
         <LogoutModal
           onClose={() => setShowLogoutModal(false)}
           onConfirm={handleSignOut}
+        />
+      )}
+
+      {showCropModal && tempImageUrl && (
+        <ImageCropModal
+          imageUrl={tempImageUrl}
+          onClose={() => {
+            setShowCropModal(false);
+            URL.revokeObjectURL(tempImageUrl);
+            setTempImageUrl('');
+          }}
+          onSave={handleCropSave}
         />
       )}
     </div>

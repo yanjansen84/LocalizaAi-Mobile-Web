@@ -37,7 +37,7 @@ interface PostCardProps {
 function PostCard({ post, onDelete }: PostCardProps) {
   const { user } = useAuth();
   const [showMenu, setShowMenu] = React.useState(false);
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(post.is_liked);
   const [likesCount, setLikesCount] = useState(post.likes_count);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -62,23 +62,6 @@ function PostCard({ post, onDelete }: PostCardProps) {
       screenHeight.current = window.innerHeight;
     }
   }, [showComments, comments]);
-
-  useEffect(() => {
-    const checkIfLiked = async () => {
-      if (!user) return;
-      
-      const { data } = await supabase
-        .from('post_likes')
-        .select('id')  
-        .eq('post_id', post.id)
-        .eq('user_id', user.id)
-        .maybeSingle(); 
-
-      setIsLiked(!!data);
-    };
-
-    checkIfLiked();
-  }, [post.id, user]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartY(e.touches[0].clientY);
@@ -226,32 +209,28 @@ function PostCard({ post, onDelete }: PostCardProps) {
   };
 
   const handleLike = async () => {
-    if (!user) return;
-
     try {
       if (isLiked) {
-        // Remove curtida
         const { error } = await supabase
           .from('post_likes')
           .delete()
           .eq('post_id', post.id)
-          .eq('user_id', user.id);
+          .eq('user_id', user?.id);
 
         if (error) throw error;
         setLikesCount(prev => prev - 1);
       } else {
-        // Adiciona curtida
         const { error } = await supabase
           .from('post_likes')
-          .insert({ post_id: post.id, user_id: user.id });
+          .insert({ post_id: post.id, user_id: user?.id });
 
         if (error) throw error;
         setLikesCount(prev => prev + 1);
       }
-      
       setIsLiked(!isLiked);
     } catch (error) {
       console.error('Erro ao curtir/descurtir post:', error);
+      toast.error('Erro ao curtir/descurtir post');
     }
   };
 

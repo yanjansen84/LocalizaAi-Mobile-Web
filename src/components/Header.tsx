@@ -1,16 +1,11 @@
-import React from 'react';
 import { Bell, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
   subtitle?: string;
 }
 
 export function Header({ subtitle = 'Encontre eventos incríveis' }: HeaderProps) {
-  const { user } = useAuth();
-  const defaultAvatar = 'https://placehold.co/48/9333ea/ffffff?text=U';
-
   return (
     <header 
       className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800"
@@ -18,22 +13,12 @@ export function Header({ subtitle = 'Encontre eventos incríveis' }: HeaderProps
       aria-label="Cabeçalho principal"
     >
       <div className="flex items-center gap-3">
-        <div 
-          className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center overflow-hidden"
-          role="img"
-          aria-label="Foto do perfil"
-        >
-          <img
-            src={user?.user_metadata?.avatar_url || defaultAvatar}
-            alt={`Avatar do usuário ${user?.user_metadata?.full_name || ''}`}
-            className="w-full h-full object-cover"
-          />
-        </div>
         <div>
-          <h1 className="text-gray-900 dark:text-white text-lg font-semibold">Olá!</h1>
-          <p className="text-gray-600 dark:text-gray-400 text-sm" aria-label="Subtítulo do cabeçalho">{subtitle}</p>
+          <h1 className="text-xl font-bold text-purple-600 dark:text-purple-500">LocalizaAí</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400" aria-label="Subtítulo do cabeçalho">{subtitle}</p>
         </div>
       </div>
+
       <div className="flex items-center gap-2" role="navigation" aria-label="Ações rápidas">
         <Link 
           to="/notificacoes"

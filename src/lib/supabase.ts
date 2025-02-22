@@ -8,3 +8,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export const getAvatarUrl = (path: string | null) => {
+  if (!path) return null;
+  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+};

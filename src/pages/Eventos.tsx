@@ -205,7 +205,6 @@ function PopularEventCard({ event }: { event: Event }) {
 function Eventos() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
