@@ -4,12 +4,70 @@ import { useNavigate } from 'react-router-dom';
 
 interface Notification {
   id: number;
-  type: 'payment' | 'cancel' | 'feature';
-  title: string;
+  type: 'follow' | 'payment' | 'cancel' | 'feature';
+  title?: string;
   message: string;
   date: string;
-  icon: string;
-  color: string;
+  timeGroup: 'Últimos 7 dias' | 'Últimos 30 dias' | 'Anterior';
+  icon?: string;
+  color?: string;
+  userId?: string;
+  userName?: string;
+  userImage?: string;
+}
+
+function NotificationItem({ notification }: { notification: Notification }) {
+  const navigate = useNavigate();
+  const [isFollowing, setIsFollowing] = React.useState(true);
+
+  const handleClick = () => {
+    if (notification.type === 'follow' && notification.userId) {
+      navigate(`/perfil/${notification.userId}`);
+    }
+  };
+
+  const handleFollowClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsFollowing(!isFollowing);
+    // Aqui você pode adicionar a lógica para seguir/deixar de seguir
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      className="w-full py-3 px-4 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer"
+    >
+      <div className="w-12 h-12">
+        <img 
+          src={notification.userImage} 
+          alt={notification.userName} 
+          className="w-full h-full rounded-full object-cover"
+        />
+      </div>
+      
+      <div className="flex-1 text-left">
+        <span className="text-sm text-gray-900 dark:text-white">
+          <span className="font-semibold">{notification.userName}</span>
+          {' '}{notification.message}
+        </span>
+        <span className="text-xs text-gray-500 block mt-0.5">
+          {notification.date}
+        </span>
+      </div>
+
+      {notification.type === 'follow' && (
+        <button 
+          onClick={handleFollowClick}
+          className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors
+            ${isFollowing 
+              ? 'bg-gray-100 dark:bg-gray-800 text-white dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700' 
+              : 'bg-purple-600 text-white hover:bg-purple-700'}`}
+        >
+          {isFollowing ? 'Seguindo' : 'Seguir'}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function Notificacoes() {
@@ -19,50 +77,69 @@ function Notificacoes() {
   const notifications: Notification[] = [
     {
       id: 1,
-      type: 'payment',
-      title: 'Pagamento Realizado!',
-      message: 'Você realizou um pagamento para o Show Bastai',
-      date: 'Hoje, 25 de Dezembro 2022',
-      icon: '✓',
-      color: 'bg-blue-500'
+      type: 'follow',
+      message: 'começou a seguir você.',
+      date: '1 d',
+      timeGroup: 'Últimos 7 dias',
+      userId: '123',
+      userName: 'docerrefugio',
+      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=doce'
     },
     {
       id: 2,
-      type: 'cancel',
-      title: 'Pedido Cancelado!',
-      message: 'Você cancelou o pagamento do Festival de Música',
-      date: 'Hoje, 25 de Dezembro 2022',
-      icon: '×',
-      color: 'bg-red-500'
+      type: 'follow',
+      message: 'curtiu seu story.',
+      date: '2 d',
+      timeGroup: 'Últimos 7 dias',
+      userId: '124',
+      userName: 'aliciinhahoficial',
+      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alicia'
     },
     {
       id: 3,
-      type: 'feature',
-      title: 'Novos Recursos Disponíveis',
-      message: 'Agora você pode convidar amigos para eventos',
-      date: 'Ontem, 24 de Dezembro 2022',
-      icon: '★',
-      color: 'bg-yellow-500'
+      type: 'follow',
+      message: 'e outras 3 pessoas convidaram você para participar de canais de transmissão.',
+      date: '4 d',
+      timeGroup: 'Últimos 7 dias',
+      userId: '125',
+      userName: 'duploacerto, chocolateriasophia',
+      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=duplo'
     },
     {
       id: 4,
-      type: 'payment',
-      title: 'Pagamento Realizado!',
-      message: 'Você realizou um pagamento para o Show em Surabaya',
-      date: 'Segunda, 23 de Dezembro 2022',
-      icon: '✓',
-      color: 'bg-blue-500'
+      type: 'follow',
+      message: 'postou uma thread que talvez você curta: Let\'s go',
+      date: '5 d',
+      timeGroup: 'Últimos 7 dias',
+      userId: '126',
+      userName: '_allanessantos',
+      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=allan'
     },
     {
       id: 5,
-      type: 'cancel',
-      title: 'Pedido Cancelado!',
-      message: 'Você realizou um pagamento',
-      date: 'Segunda, 23 de Dezembro 2022',
-      icon: '×',
-      color: 'bg-red-500'
+      type: 'follow',
+      message: 'curtiram seu story.',
+      date: '1 sem',
+      timeGroup: 'Últimos 30 dias',
+      userId: '127',
+      userName: 'aliciinhahoficial e deboradiasdld',
+      userImage: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alicia2'
     }
   ];
+
+  // Agrupa as notificações por período
+  const groupedNotifications = notifications.reduce((groups, notification) => {
+    const group = groups.find(g => g.timeGroup === notification.timeGroup);
+    if (group) {
+      group.notifications.push(notification);
+    } else {
+      groups.push({
+        timeGroup: notification.timeGroup,
+        notifications: [notification]
+      });
+    }
+    return groups;
+  }, [] as { timeGroup: string; notifications: Notification[] }[]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
@@ -80,9 +157,6 @@ function Notificacoes() {
               Notificações
             </h1>
           </div>
-          <button className="p-2 text-gray-600 dark:text-gray-400">
-            <MoreVertical className="w-6 h-6" />
-          </button>
         </div>
       </div>
 
@@ -98,41 +172,20 @@ function Notificacoes() {
             </h2>
           </div>
         ) : (
-          <div className="p-4">
-            {notifications.reduce((acc: JSX.Element[], notification, index, array) => {
-              // Check if we need to add a date header
-              if (index === 0 || notification.date !== array[index - 1].date) {
-                acc.push(
-                  <div key={`date-${notification.date}`} className="text-sm text-gray-600 dark:text-gray-400 mb-4 mt-6">
-                    {notification.date}
-                  </div>
-                );
-              }
-
-              // Add the notification
-              acc.push(
-                <div
-                  key={notification.id}
-                  className="mb-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl"
-                >
-                  <div className="flex gap-4">
-                    <div className={`w-10 h-10 ${notification.color} rounded-full flex items-center justify-center text-white`}>
-                      {notification.icon}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                        {notification.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {notification.message}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-
-              return acc;
-            }, [])}
+          <div>
+            {groupedNotifications.map((group) => (
+              <div key={group.timeGroup}>
+                <h2 className="px-4 py-3 text-base font-semibold text-gray-900 dark:text-white">
+                  {group.timeGroup}
+                </h2>
+                {group.notifications.map((notification) => (
+                  <NotificationItem 
+                    key={notification.id} 
+                    notification={notification}
+                  />
+                ))}
+              </div>
+            ))}
           </div>
         )}
       </div>
