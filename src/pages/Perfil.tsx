@@ -621,11 +621,17 @@ function Perfil() {
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{profile?.events_count || 0}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Eventos</p>
                 </div>
-                <div className="text-center">
+                <div 
+                  className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => navigate(`/perfil/${profile?.id}/followers?type=followers`)}
+                >
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{profile?.followers_count}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Seguidores</p>
                 </div>
-                <div className="text-center">
+                <div 
+                  className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => navigate(`/perfil/${profile?.id}/following?type=following`)}
+                >
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{profile?.following_count}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Seguindo</p>
                 </div>
