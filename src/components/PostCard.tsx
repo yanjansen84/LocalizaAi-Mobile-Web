@@ -47,14 +47,14 @@ function PostCard({ post, onDelete }: PostCardProps) {
   const [editedCommentText, setEditedCommentText] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
-  const modalRef = useRef(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [modalPosition, setModalPosition] = useState(0);
-  const modalHeight = useRef(0);
-  const screenHeight = useRef(0);
+  const modalHeight = useRef<number>(0);
+  const screenHeight = useRef<number>(0);
 
   useEffect(() => {
     if (modalRef.current) {
@@ -63,12 +63,56 @@ function PostCard({ post, onDelete }: PostCardProps) {
     }
   }, [showComments, comments]);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
+  useEffect(() => {
+    const checkLikeStatus = async () => {
+      if (!user) return;
+
+      try {
+        // Verifica se o usuário atual curtiu
+        const { data: likeData, error: likeError } = await supabase
+          .from('post_likes')
+          .select('id')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id);
+
+        if (likeError) {
+          console.error('Erro ao verificar curtida:', likeError);
+          return;
+        }
+
+        setIsLiked(likeData && likeData.length > 0);
+
+        // Conta total de curtidas
+        const { count, error: countError } = await supabase
+          .from('post_likes')
+          .select('id', { count: 'exact' })
+          .eq('post_id', post.id);
+
+        if (!countError && count !== null) {
+          setLikesCount(count);
+          
+          // Atualiza o contador no post se necessário
+          if (count !== post.likes_count) {
+            await supabase
+              .from('posts')
+              .update({ likes_count: count })
+              .eq('id', post.id);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar curtidas:', error);
+      }
+    };
+
+    checkLikeStatus();
+  }, [post.id, user]);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     setStartY(e.touches[0].clientY);
     setCurrentY(e.touches[0].clientY);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     const currentTouch = e.touches[0].clientY;
     const diff = currentTouch - startY;
     setCurrentY(currentTouch);
@@ -209,25 +253,72 @@ function PostCard({ post, onDelete }: PostCardProps) {
   };
 
   const handleLike = async () => {
+    if (!user) {
+      toast.error('Faça login para curtir posts');
+      return;
+    }
+
     try {
       if (isLiked) {
-        const { error } = await supabase
+        // Remove a curtida do usuário atual
+        const { error: likeError } = await supabase
           .from('post_likes')
           .delete()
           .eq('post_id', post.id)
-          .eq('user_id', user?.id);
+          .eq('user_id', user.id);
 
-        if (error) throw error;
-        setLikesCount(prev => prev - 1);
-      } else {
-        const { error } = await supabase
+        if (likeError) throw likeError;
+
+        // Atualiza o contador baseado no total real de curtidas
+        const { count, error: countError } = await supabase
           .from('post_likes')
-          .insert({ post_id: post.id, user_id: user?.id });
+          .select('id', { count: 'exact' })
+          .eq('post_id', post.id);
 
-        if (error) throw error;
-        setLikesCount(prev => prev + 1);
+        if (countError) throw countError;
+
+        const newCount = count || 0;
+        await supabase
+          .from('posts')
+          .update({ likes_count: newCount })
+          .eq('id', post.id);
+
+        setLikesCount(newCount);
+        setIsLiked(false);
+      } else {
+        // Adiciona a curtida do usuário atual
+        const { error: likeError } = await supabase
+          .from('post_likes')
+          .insert({ 
+            post_id: post.id, 
+            user_id: user.id 
+          });
+
+        if (likeError) {
+          if (likeError.code === '23505') {
+            // Se já existe uma curtida, ignora
+            return;
+          }
+          throw likeError;
+        }
+
+        // Atualiza o contador baseado no total real de curtidas
+        const { count, error: countError } = await supabase
+          .from('post_likes')
+          .select('id', { count: 'exact' })
+          .eq('post_id', post.id);
+
+        if (countError) throw countError;
+
+        const newCount = count || 0;
+        await supabase
+          .from('posts')
+          .update({ likes_count: newCount })
+          .eq('id', post.id);
+
+        setLikesCount(newCount);
+        setIsLiked(true);
       }
-      setIsLiked(!isLiked);
     } catch (error) {
       console.error('Erro ao curtir/descurtir post:', error);
       toast.error('Erro ao curtir/descurtir post');
@@ -365,12 +456,11 @@ function PostCard({ post, onDelete }: PostCardProps) {
         <div className="fixed inset-0 bg-black/50 z-50" onClick={(e) => e.target === e.currentTarget && setShowComments(false)}>
           <div
             ref={modalRef}
+            className="fixed inset-x-0 bottom-0 bg-white dark:bg-gray-900 rounded-t-xl shadow-xl overflow-hidden transition-all duration-300 ease-out"
             style={{
-              transform: `translateY(${modalPosition}px)`,
-              transition: 'all 0.3s ease-out',
               height: '90vh',
+              transform: `translateY(${modalPosition}px)`,
             }}
-            className="fixed inset-x-0 bottom-0 bg-white dark:bg-gray-900 rounded-t-xl shadow-xl overflow-hidden"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}

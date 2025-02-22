@@ -240,6 +240,29 @@ function EventosPopulares() {
               <SlidersHorizontal className="w-6 h-6" />
             </button>
           </div>
+
+          {/* Categories */}
+          <div className="flex gap-2 overflow-x-auto pb-4 mt-4 scrollbar-hide">
+            {categories.map(category => (
+              <button
+                key={category.id}
+                onClick={() => {
+                  setFilters(prev => ({
+                    ...prev,
+                    categories: [category.id]
+                  }));
+                }}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-full whitespace-nowrap ${
+                  filters.categories.includes(category.id)
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                }`}
+              >
+                <span>{category.icon}</span>
+                <span>{category.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Event List */}
