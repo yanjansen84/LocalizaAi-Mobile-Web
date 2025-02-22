@@ -8,20 +8,26 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import ErrorFeedback from '../components/ErrorFeedback';
+import CreatePostButton from '../components/CreatePostButton';
+import PostCard from '../components/PostCard';
 
 interface Post {
   id: string;
   image_url: string;
   caption: string | null;
   created_at: string;
-  user_full_name: string;
-  user_avatar_url: string | null;
+  user_id: string;
   likes_count: number;
   is_liked: boolean;
   comments_count: number;
   latest_comment?: {
     user_full_name: string;
     content: string;
+  };
+  user?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
   };
 }
 
@@ -46,42 +52,45 @@ function Feed() {
 
   useEffect(() => {
     if (user) {
-      loadPosts(true);
+      loadPosts();
     }
   }, [user]);
 
-  async function loadPosts(refresh = false) {
+  const loadPosts = async () => {
     try {
-      if (!user || (!hasMore && !refresh)) return;
+      // Primeiro buscar os posts
+      const { data: posts, error: postsError } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (refresh) {
-        setPage(1);
-        setPosts([]);
-        setHasMore(true);
-      }
+      if (postsError) throw postsError;
+      if (!posts) return;
 
-      setLoading(true);
-      setError(null);
+      // Depois buscar os perfis para cada post
+      const userIds = [...new Set(posts.map(post => post.user_id))];
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
 
-      // Chamar a função RPC diretamente
-      const { data, error } = await supabase.rpc('get_user_feed', {
-        p_user_id: user.id
-      });
+      if (profilesError) throw profilesError;
 
-      if (error) throw error;
-      if (data) {
-        setPosts(prev => refresh ? data : [...prev, ...data]);
-        setHasMore(data.length === 10);
-        if (!refresh) setPage(prev => prev + 1);
-      }
+      // Combinar os dados
+      const postsWithProfiles = posts.map(post => ({
+        ...post,
+        user: profiles?.find(profile => profile.id === post.user_id)
+      }));
+
+      setPosts(postsWithProfiles);
     } catch (error) {
-      console.error('Erro ao carregar feed:', error);
+      console.error('Erro ao carregar posts:', error);
       setError('Não foi possível carregar o feed. Tente novamente mais tarde.');
       toast.error('Erro ao carregar feed');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   const handleToggleLike = async (postId: string) => {
     try {
@@ -168,6 +177,7 @@ function Feed() {
             >
               <Search size={20} />
             </button>
+            <CreatePostButton onPostCreated={loadPosts} />
           </div>
         </div>
       </div>
@@ -196,74 +206,7 @@ function Feed() {
         {/* Posts */}
         <div className="space-y-6">
           {posts.map(post => (
-            <div key={post.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-              {/* Header do Post */}
-              <div className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={post.user_avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user_full_name)}&background=random`}
-                    alt={post.user_full_name}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">
-                      {post.user_full_name}
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {formatDistanceToNow(new Date(post.created_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </p>
-                  </div>
-                </div>
-                <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                  <MoreHorizontal size={20} />
-                </button>
-              </div>
-
-              {/* Imagem do Post */}
-              <div className="aspect-square relative">
-                <img
-                  src={post.image_url}
-                  alt="Post"
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              </div>
-
-              {/* Ações do Post */}
-              <div className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => handleToggleLike(post.id)}
-                    className={`${post.is_liked ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'} hover:text-red-500 dark:hover:text-red-400`}
-                  >
-                    <Heart size={24} />
-                  </button>
-                  <button className="text-gray-500 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400">
-                    <MessageCircle size={24} />
-                  </button>
-                  <button className="text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400">
-                    <Share2 size={24} />
-                  </button>
-                </div>
-                <button className="text-gray-500 dark:text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400">
-                  <Bookmark size={24} />
-                </button>
-              </div>
-
-              {/* Descrição do Post */}
-              {post.caption && (
-                <div className="px-4 pb-4">
-                  <p className="text-gray-900 dark:text-white">
-                    <span className="font-medium text-gray-900 dark:text-white mr-2">
-                      {post.user_full_name}
-                    </span>
-                    {post.caption}
-                  </p>
-                </div>
-              )}
-            </div>
+            <PostCard key={post.id} post={post} onDelete={loadPosts} />
           ))}
         </div>
       </main>
