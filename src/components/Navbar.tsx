@@ -1,9 +1,11 @@
 import React from 'react';
 import { Home, Map, Ticket, User, Calendar } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 function Navbar() {
   const location = useLocation();
+  const { user } = useAuth();
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -14,7 +16,7 @@ function Navbar() {
     { icon: Home, label: 'Feed', path: '/feed' },
     { icon: Map, label: 'Mapa', path: '/mapa' },
     { icon: Ticket, label: 'Ingressos', path: '/ingressos' },
-    { icon: User, label: 'Perfil', path: '/perfil' },
+    { icon: User, label: 'Perfil', path: user ? `/perfil/${user.id}` : '/perfil' },
   ];
 
   return (
@@ -39,4 +41,4 @@ function Navbar() {
   );
 }
 
-export default Navbar
+export default Navbar;

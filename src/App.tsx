@@ -70,6 +70,7 @@ function App() {
             <Route path="/destaques" element={<Destaques />} />
             <Route path="/eventos-populares" element={<EventosPopulares />} />
             <Route path="/perfil" element={<Perfil />} />
+            <Route path="/perfil/:id" element={<Perfil />} />
             <Route path="/ingressos" element={<Ingressos />} />
             <Route path="/search" element={<Search />} />
             

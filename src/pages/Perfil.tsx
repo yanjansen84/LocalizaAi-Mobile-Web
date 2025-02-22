@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
+import { toast } from 'react-hot-toast';
 
 interface UserProfile {
   id: string;
@@ -149,7 +150,7 @@ function Perfil() {
 
   useEffect(() => {
     loadProfile();
-  }, [user]);
+  }, [user, profileId]); // Recarrega quando o profileId mudar
 
   async function loadProfile() {
     try {
@@ -160,14 +161,31 @@ function Perfil() {
       // Carregar dados do perfil
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url')  // Seleciona todos os campos
+        .select('id, full_name, avatar_url')
         .eq('id', targetId)
-        .maybeSingle();  // Usa maybeSingle ao invés de single para evitar erro
+        .maybeSingle();
 
       if (profileError) {
         console.error('Erro ao carregar perfil:', profileError);
         return;
       }
+
+      // Carregar contadores
+      const [followersCount, followingCount] = await Promise.all([
+        // Contar seguidores
+        supabase
+          .from('followers')
+          .select('id', { count: 'exact' })
+          .eq('followed_id', targetId)
+          .then(({ count }) => count || 0),
+        
+        // Contar seguindo
+        supabase
+          .from('followers')
+          .select('id', { count: 'exact' })
+          .eq('follower_id', targetId)
+          .then(({ count }) => count || 0)
+      ]);
 
       if (!profileData) {
         // Se o perfil não existe, cria um novo
@@ -188,24 +206,57 @@ function Perfil() {
           return;
         }
 
-        setProfile({
-          ...(newProfile || {}),
-          followers_count: 0,
-          following_count: 0,
-          events_count: 0,
-          is_following: false
-        });
+        // Verificar se está seguindo
+        if (!isOwnProfile) {
+          const { data: followData } = await supabase
+            .from('followers')
+            .select('id')
+            .eq('follower_id', user.id)
+            .eq('followed_id', targetId)
+            .maybeSingle();
+
+          setProfile({
+            ...(newProfile || {}),
+            followers_count: followersCount,
+            following_count: followingCount,
+            events_count: 0,
+            is_following: !!followData
+          });
+        } else {
+          setProfile({
+            ...(newProfile || {}),
+            followers_count: followersCount,
+            following_count: followingCount,
+            events_count: 0
+          });
+        }
         return;
       }
 
-      // Se encontrou o perfil, adiciona os contadores
-      setProfile({
-        ...profileData,
-        followers_count: 0,
-        following_count: 0,
-        events_count: 0,
-        is_following: false
-      });
+      // Se encontrou o perfil, verificar se está seguindo
+      if (!isOwnProfile) {
+        const { data: followData } = await supabase
+          .from('followers')
+          .select('id')
+          .eq('follower_id', user.id)
+          .eq('followed_id', targetId)
+          .maybeSingle();
+
+        setProfile({
+          ...profileData,
+          followers_count: followersCount,
+          following_count: followingCount,
+          events_count: 0,
+          is_following: !!followData
+        });
+      } else {
+        setProfile({
+          ...profileData,
+          followers_count: followersCount,
+          following_count: followingCount,
+          events_count: 0
+        });
+      }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
     } finally {
@@ -362,7 +413,7 @@ function Perfil() {
   };
 
   const handleFollow = async () => {
-    if (!user || !profile || followLoading) return;
+    if (!user || !profile || followLoading || isOwnProfile) return;
     
     try {
       setFollowLoading(true);
@@ -375,12 +426,17 @@ function Perfil() {
           .eq('follower_id', user.id)
           .eq('followed_id', profile.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao deixar de seguir:', error);
+          toast.error('Erro ao deixar de seguir usuário');
+          return;
+        }
 
+        toast.success('Deixou de seguir');
         setProfile(prev => prev ? {
           ...prev,
           is_following: false,
-          followers_count: prev.followers_count - 1
+          followers_count: Math.max(0, prev.followers_count - 1)
         } : null);
       } else {
         // Seguir
@@ -391,8 +447,13 @@ function Perfil() {
             followed_id: profile.id
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao seguir:', error);
+          toast.error('Erro ao seguir usuário');
+          return;
+        }
 
+        toast.success('Seguindo!');
         setProfile(prev => prev ? {
           ...prev,
           is_following: true,
@@ -401,6 +462,7 @@ function Perfil() {
       }
     } catch (error) {
       console.error('Erro ao atualizar follow:', error);
+      toast.error('Erro ao atualizar seguidor');
     } finally {
       setFollowLoading(false);
     }
