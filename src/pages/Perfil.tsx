@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   MessageCircle, MoreHorizontal, Heart, MapPin, Calendar, Moon, Sun,
   Settings, ChevronRight, Shield, Languages, HelpCircle, Users, Star,
-  LogOut, Ticket, Loader, Camera, X
+  LogOut, Ticket, Loader, Camera, X, Bell
 } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -527,12 +527,20 @@ function Perfil() {
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
             Perfil
           </h1>
-          <button 
-            onClick={() => navigate('/configuracoes')}
-            className="text-gray-700 dark:text-gray-300"
-          >
-            <Settings className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-4 absolute top-4 right-4">
+            <button
+              onClick={() => navigate('/notificacoes')}
+              className="text-gray-700 dark:text-gray-300"
+            >
+              <Bell className="w-6 h-6" />
+            </button>
+            <button 
+              onClick={() => navigate('/configuracoes')}
+              className="text-gray-700 dark:text-gray-300"
+            >
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
