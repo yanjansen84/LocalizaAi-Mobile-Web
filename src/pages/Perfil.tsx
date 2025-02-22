@@ -33,11 +33,16 @@ interface Event {
 
 interface Post {
   id: string;
+  user_id: string;
   image_url: string;
   caption: string | null;
+  location: string | null;
   created_at: string;
   likes_count: number;
+  comments_count: number;
   is_liked: boolean;
+  user_full_name: string;
+  user_avatar_url: string | null;
 }
 
 function LogoutModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
@@ -330,32 +335,15 @@ function Perfil() {
       setLoadingPosts(true);
       
       const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          id,
-          image_url,
-          caption,
-          created_at,
-          likes_count,
-          post_likes!inner(id)
-        `)
-        .eq('user_id', profile.id)
-        .eq('post_likes.user_id', user?.id)
-        .range((postsPage - 1) * 12, postsPage * 12 - 1)
-        .order('created_at', { ascending: false });
+        .rpc('get_user_posts', { p_user_id: profile.id });
 
       if (error) throw error;
 
-      const postsWithLikes = data?.map(post => ({
-        ...post,
-        is_liked: post.post_likes?.length > 0
-      })) || [];
-
-      setPosts(prev => refresh ? postsWithLikes : [...prev, ...postsWithLikes]);
-      setHasMorePosts(data?.length === 12);
-      if (!refresh) setPostsPage(prev => prev + 1);
+      setPosts(data || []);
+      setHasMorePosts(data && data.length === 12);
     } catch (error) {
       console.error('Erro ao carregar posts:', error);
+      toast.error('Erro ao carregar posts');
     } finally {
       setLoadingPosts(false);
     }
@@ -740,16 +728,7 @@ function Perfil() {
             )}
 
             {activeTab === 'colecoes' && (
-              <>
-                {isOwnProfile && (
-                  <button
-                    onClick={() => navigate('/novo-post')}
-                    className="mx-4 mb-4 py-2 bg-purple-600 text-white rounded-full text-sm font-medium hover:bg-purple-700 transition-colors"
-                  >
-                    Criar Nova Postagem
-                  </button>
-                )}
-                
+              <div>
                 <div className="grid grid-cols-3 gap-[2px]">
                   {posts.map(post => (
                     <div 
@@ -783,14 +762,6 @@ function Perfil() {
                     <p className="text-gray-500 dark:text-gray-400 mb-4">
                       Nenhuma postagem encontrada
                     </p>
-                    {isOwnProfile && (
-                      <button
-                        onClick={() => navigate('/novo-post')}
-                        className="bg-purple-600 text-white px-6 py-2 rounded-full text-sm hover:bg-purple-700 transition-colors"
-                      >
-                        Criar Primeira Postagem
-                      </button>
-                    )}
                   </div>
                 )}
 
@@ -799,7 +770,7 @@ function Perfil() {
                     Não há mais postagens para carregar
                   </p>
                 )}
-              </>
+              </div>
             )}
 
             {activeTab === 'sobre' && (
