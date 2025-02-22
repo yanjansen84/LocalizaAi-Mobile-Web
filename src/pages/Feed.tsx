@@ -52,30 +52,16 @@ function Feed() {
       setLoading(true);
       setError(null);
 
-      // Tentativa 1: Usando o nome completo da função
-      const { data, error } = await supabase.rpc('public.get_user_feed', {
-        p_user_id: user.id  // Garantindo que o nome do parâmetro está correto
+      // Chamar a função RPC diretamente
+      const { data, error } = await supabase.rpc('get_user_feed', {
+        p_user_id: user.id
       });
 
-      // Se a primeira tentativa falhar, tente a segunda
-      if (error && error.message.includes('function not found')) {
-        const { data: data2, error: error2 } = await supabase.rpc('get_user_feed', {
-          p_user_id: user.id
-        });
-        
-        if (error2) throw error2;
-        if (data2) {
-          setPosts(prev => refresh ? data2 : [...prev, ...data2]);
-          setHasMore(data2.length === 10);
-          if (!refresh) setPage(prev => prev + 1);
-        }
-      } else {
-        if (error) throw error;
-        if (data) {
-          setPosts(prev => refresh ? data : [...prev, ...data]);
-          setHasMore(data.length === 10);
-          if (!refresh) setPage(prev => prev + 1);
-        }
+      if (error) throw error;
+      if (data) {
+        setPosts(prev => refresh ? data : [...prev, ...data]);
+        setHasMore(data.length === 10);
+        if (!refresh) setPage(prev => prev + 1);
       }
     } catch (error) {
       console.error('Erro ao carregar feed:', error);
