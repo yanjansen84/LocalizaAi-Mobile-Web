@@ -157,10 +157,10 @@ function Perfil() {
       
       const targetId = profileId || user.id;
       
-      // Primeiro, carregar dados do perfil
+      // Carregar dados do perfil da tabela correta (profiles)
       const { data: profileData, error: profileError } = await supabase
-        .from('users')
-        .select('id, full_name, avatar_url, bio, followers_count, following_count, events_count')
+        .from('profiles')
+        .select('id, full_name, avatar_url')
         .eq('id', targetId)
         .single();
 
@@ -172,7 +172,7 @@ function Perfil() {
           .from('followers')
           .select('id')
           .eq('follower_id', user.id)
-          .eq('following_id', targetId)
+          .eq('followed_id', targetId)
           .single();
 
         if (followError && followError.code !== 'PGRST116') { // Ignora erro de não encontrado
@@ -181,6 +181,12 @@ function Perfil() {
 
         profileData.is_following = !!followData;
       }
+
+      // Adicionar contadores zerados por enquanto
+      profileData.followers_count = 0;
+      profileData.following_count = 0;
+      profileData.events_count = 0;
+      profileData.bio = null;
 
       setProfile(profileData);
       setPhotoKey(Date.now()); // Forçar atualização da imagem
@@ -215,7 +221,7 @@ function Perfil() {
 
       setLoadingEvents(true);
       
-      // Buscar eventos que o usuário se inscreveu
+      // Buscar eventos do usuário
       const { data, error } = await supabase
         .from('events')
         .select(`
@@ -226,7 +232,7 @@ function Perfil() {
           image_url,
           is_free
         `)
-        .eq('id', supabase.from('event_registrations').select('event_id').eq('user_id', profile.id))
+        .eq('user_id', profile.id)
         .range((page - 1) * 10, page * 10 - 1)
         .order('date', { ascending: false });
 
@@ -325,7 +331,7 @@ function Perfil() {
       if (!data.publicUrl) throw new Error('Erro ao obter URL pública');
 
       // Atualizar o perfil com a URL pública
-      const { error: updateError } = await supabase.from('users').update({ avatar_url: data.publicUrl }).eq('id', user.id);
+      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', user.id);
       if (updateError) throw updateError;
 
       // Atualizar o estado do perfil
@@ -351,7 +357,7 @@ function Perfil() {
           .from('followers')
           .delete()
           .eq('follower_id', user.id)
-          .eq('following_id', profile.id);
+          .eq('followed_id', profile.id);
 
         if (error) throw error;
 
@@ -366,7 +372,7 @@ function Perfil() {
           .from('followers')
           .insert({
             follower_id: user.id,
-            following_id: profile.id
+            followed_id: profile.id
           });
 
         if (error) throw error;
