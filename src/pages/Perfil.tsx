@@ -7,6 +7,7 @@ import {
 import { useTheme } from '../ThemeProvider';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import { toast } from 'react-hot-toast';
@@ -81,6 +82,7 @@ function Perfil() {
   const { id: profileId } = useParams(); // ID do perfil sendo visualizado
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { createNotification } = useNotification();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'eventos' | 'colecoes' | 'sobre'>('eventos');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -448,6 +450,16 @@ function Perfil() {
           return;
         }
 
+        // Criar notificação de unfollow
+        await createNotification({
+          type: 'follow',
+          message: 'deixou de te seguir',
+          from_user_id: user.id,
+          from_user_name: user.user_metadata.full_name || user.email?.split('@')[0],
+          from_user_image: user.user_metadata.avatar_url,
+          user_id: profile.id
+        });
+
         toast.success('Deixou de seguir');
         setProfile(prev => prev ? {
           ...prev,
@@ -469,6 +481,16 @@ function Perfil() {
           return;
         }
 
+        // Criar notificação de follow
+        await createNotification({
+          type: 'follow',
+          message: 'começou a te seguir',
+          from_user_id: user.id,
+          from_user_name: user.user_metadata.full_name || user.email?.split('@')[0],
+          from_user_image: user.user_metadata.avatar_url,
+          user_id: profile.id
+        });
+
         toast.success('Seguindo!');
         setProfile(prev => prev ? {
           ...prev,
@@ -477,8 +499,8 @@ function Perfil() {
         } : null);
       }
     } catch (error) {
-      console.error('Erro ao atualizar follow:', error);
-      toast.error('Erro ao atualizar seguidor');
+      console.error('Erro:', error);
+      toast.error('Ocorreu um erro');
     } finally {
       setFollowLoading(false);
     }
